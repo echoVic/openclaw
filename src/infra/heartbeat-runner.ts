@@ -10,6 +10,7 @@ import {
   resolveAgentWorkspaceDir,
   resolveDefaultAgentId,
 } from "../agents/agent-scope.js";
+import { appendCronStyleCurrentTimeLine } from "../agents/current-time.js";
 import { resolveUserTimezone } from "../agents/date-time.js";
 import { resolveEffectiveMessagesConfig } from "../agents/identity.js";
 import { DEFAULT_HEARTBEAT_FILENAME } from "../agents/workspace.js";
@@ -588,8 +589,12 @@ export async function runHeartbeatOnce(opts: {
     : hasCronEvents
       ? CRON_EVENT_PROMPT
       : resolveHeartbeatPrompt(cfg, heartbeat);
+
+  // Keep heartbeats consistent with cron: include an explicit "Current time: ..."
+  // line so the model has stable "now" awareness even outside channel envelopes.
+  const promptWithTime = appendCronStyleCurrentTimeLine(prompt, cfg, startedAt);
   const ctx = {
-    Body: prompt,
+    Body: promptWithTime,
     From: sender,
     To: sender,
     Provider: hasExecCompletion ? "exec-event" : hasCronEvents ? "cron-event" : "heartbeat",
