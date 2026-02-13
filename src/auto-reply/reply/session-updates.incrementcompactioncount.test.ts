@@ -70,7 +70,7 @@ describe("incrementCompactionCount", () => {
     expect(stored[sessionKey].outputTokens).toBeUndefined();
   });
 
-  it("does not update totalTokens when tokensAfter is not provided", async () => {
+  it("resets totalTokens to 0 when tokensAfter is not provided", async () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-compact-"));
     const storePath = path.join(tmp, "sessions.json");
     const sessionKey = "main";
@@ -92,7 +92,9 @@ describe("incrementCompactionCount", () => {
 
     const stored = JSON.parse(await fs.readFile(storePath, "utf-8"));
     expect(stored[sessionKey].compactionCount).toBe(1);
-    // totalTokens unchanged
-    expect(stored[sessionKey].totalTokens).toBe(180_000);
+    // totalTokens reset to 0 to prevent stale values from triggering false memory flushes
+    expect(stored[sessionKey].totalTokens).toBe(0);
+    expect(stored[sessionKey].inputTokens).toBe(0);
+    expect(stored[sessionKey].outputTokens).toBe(0);
   });
 });
