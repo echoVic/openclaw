@@ -252,6 +252,17 @@ export type AgentCompactionConfig = {
   reserveTokensFloor?: number;
   /** Max share of context window for history during safeguard pruning (0.1–0.9, default 0.5). */
   maxHistoryShare?: number;
+  /**
+   * Target token count after compaction. If the compacted session still exceeds
+   * this limit, older messages are trimmed until the target is met.
+   * Default: contextTokens * 0.25 (25% of the context window).
+   */
+  targetTokens?: number;
+  /**
+   * Fraction of the most recent messages to retain when compaction fails and
+   * the fallback strategy kicks in (0.0–1.0). Default: 0.2 (keep newest 20%).
+   */
+  fallbackRetainPercent?: number;
   /** Pre-compaction memory flush (agentic turn). Default: enabled. */
   memoryFlush?: AgentCompactionMemoryFlushConfig;
 };

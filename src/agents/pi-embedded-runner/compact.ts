@@ -55,6 +55,12 @@ import {
   type SkillSnapshot,
 } from "../skills.js";
 import { resolveTranscriptPolicy } from "../transcript-policy.js";
+import {
+  DEFAULT_COMPACTION_TARGET_RATIO,
+  DEFAULT_FALLBACK_RETAIN_PERCENT,
+  fallbackCompact,
+  trimToTargetTokens,
+} from "./compaction-trimming.js";
 import { buildEmbeddedExtensionPaths } from "./extensions.js";
 import {
   logToolSchemasForGoogle,
@@ -443,7 +449,52 @@ export async function compactEmbeddedPiSessionDirect(
         if (limited.length > 0) {
           session.agent.replaceMessages(limited);
         }
-        const result = await session.compact(params.customInstructions);
+
+        // Resolve compaction target tokens from config
+        const compactionCfg = params.config?.agents?.defaults?.compaction;
+        const contextTokens = params.config?.agents?.defaults?.contextTokens;
+        const targetTokens =
+          compactionCfg?.targetTokens ??
+          (contextTokens ? Math.round(contextTokens * DEFAULT_COMPACTION_TARGET_RATIO) : undefined);
+        const fallbackRetainPercent =
+          compactionCfg?.fallbackRetainPercent ?? DEFAULT_FALLBACK_RETAIN_PERCENT;
+
+        let result: Awaited<ReturnType<typeof session.compact>>;
+        try {
+          result = await session.compact(params.customInstructions);
+        } catch (compactErr) {
+          // Compaction LLM call failed — apply fallback strategy.
+          // We estimate tokensBefore from the current session state so callers
+          // get accurate pre-compaction metrics even in the fallback path.
+          log.warn(
+            `compaction LLM call failed, applying fallback retain strategy: ${describeUnknownError(compactErr)}`,
+          );
+          let tokensBefore = 0;
+          try {
+            for (const msg of session.messages) {
+              tokensBefore += estimateTokens(msg);
+            }
+          } catch {
+            // best-effort
+          }
+          const fb = fallbackCompact(session.messages, fallbackRetainPercent);
+          if (fb.messages.length > 0 && fb.messages.length < session.messages.length) {
+            session.agent.replaceMessages(fb.messages);
+          }
+          return {
+            ok: true,
+            compacted: false,
+            reason: "[fallback] LLM compaction failed; retained newest messages",
+            result: {
+              summary: "[fallback] LLM compaction failed; retained newest messages",
+              firstKeptEntryId: "",
+              tokensBefore,
+              tokensAfter: fb.tokensAfter,
+              details: { fallback: true, retainPercent: fallbackRetainPercent },
+            },
+          };
+        }
+
         // Estimate tokens after compaction by summing token estimates for remaining messages
         let tokensAfter: number | undefined;
         try {
@@ -459,6 +510,21 @@ export async function compactEmbeddedPiSessionDirect(
           // If estimation fails, leave tokensAfter undefined
           tokensAfter = undefined;
         }
+
+        // Post-compaction trimming: if we have a target and still exceed it, trim older messages
+        let trimmed = false;
+        if (targetTokens && tokensAfter && tokensAfter > targetTokens) {
+          const trimResult = trimToTargetTokens(session.messages, targetTokens);
+          if (trimResult) {
+            session.agent.replaceMessages(trimResult.trimmed);
+            tokensAfter = trimResult.tokensAfter;
+            trimmed = true;
+            log.info(
+              `post-compaction trimming: reduced to ${trimResult.trimmed.length} messages, ~${tokensAfter} tokens (target: ${targetTokens})`,
+            );
+          }
+        }
+
         return {
           ok: true,
           compacted: true,
@@ -467,7 +533,13 @@ export async function compactEmbeddedPiSessionDirect(
             firstKeptEntryId: result.firstKeptEntryId,
             tokensBefore: result.tokensBefore,
             tokensAfter,
-            details: result.details,
+            details: trimmed
+              ? {
+                  ...(result.details as Record<string, unknown> | undefined),
+                  postTrimmed: true,
+                  targetTokens,
+                }
+              : result.details,
           },
         };
       } finally {
