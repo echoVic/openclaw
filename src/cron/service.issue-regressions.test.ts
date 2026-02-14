@@ -188,7 +188,7 @@ describe("Cron issue regressions", () => {
     const now = Date.parse("2026-02-06T10:05:00.000Z");
     vi.setSystemTime(now);
     const cron = new CronService({
-      cronEnabled: true,
+      cronEnabled: false,
       storePath: store.storePath,
       log: noopLogger,
       enqueueSystemEvent: vi.fn(),
