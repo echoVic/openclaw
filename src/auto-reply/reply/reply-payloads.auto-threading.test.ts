@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyReplyThreading } from "./reply-payloads.js";
+import { createReplyToModeFilter } from "./reply-threading.js";
 
 describe("applyReplyThreading auto-threading", () => {
   it("sets replyToId to currentMessageId even without [[reply_to_current]] tag", () => {
@@ -59,17 +60,21 @@ describe("applyReplyThreading auto-threading", () => {
     expect(result).toHaveLength(1);
     expect(result[0].replyToId).toBeUndefined();
   });
+});
 
-  it("keeps explicit tags for Slack when off mode allows tags", () => {
-    const result = applyReplyThreading({
-      payloads: [{ text: "[[reply_to_current]]A" }],
-      replyToMode: "off",
-      replyToChannel: "slack",
-      currentMessageId: "42",
-    });
+describe("createReplyToModeFilter allowTagsWhenOff", () => {
+  it("keeps explicit reply tags when off mode has allowTagsWhenOff enabled", () => {
+    const filter = createReplyToModeFilter("off", { allowTagsWhenOff: true });
+    const result = filter({ text: "A", replyToId: "42", replyToTag: true });
 
-    expect(result).toHaveLength(1);
-    expect(result[0].replyToId).toBe("42");
-    expect(result[0].replyToTag).toBe(true);
+    expect(result.replyToId).toBe("42");
+    expect(result.replyToTag).toBe(true);
+  });
+
+  it("strips implicit replies even with allowTagsWhenOff enabled", () => {
+    const filter = createReplyToModeFilter("off", { allowTagsWhenOff: true });
+    const result = filter({ text: "A", replyToId: "42" });
+
+    expect(result.replyToId).toBeUndefined();
   });
 });
