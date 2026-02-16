@@ -1,7 +1,7 @@
+import type { Page } from "playwright-core";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { Page } from "playwright-core";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import {
   ensurePageState,
@@ -171,10 +171,14 @@ export async function armDialogViaPlaywright(opts: {
       if (state.armIdDialog !== armId) {
         return;
       }
-      if (opts.accept) {
-        await dialog.accept(opts.promptText);
-      } else {
-        await dialog.dismiss();
+      try {
+        if (opts.accept) {
+          await dialog.accept(opts.promptText);
+        } else {
+          await dialog.dismiss();
+        }
+      } catch {
+        // Dialog may have been dismissed or page navigated away; ignore.
       }
     })
     .catch(() => {
