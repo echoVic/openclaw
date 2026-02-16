@@ -1,9 +1,9 @@
 import fsSync from "node:fs";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveAgentDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { resolveMemorySearchConfig } from "../agents/memory-search.js";
 import { resolveApiKeyForProvider } from "../agents/model-auth.js";
 import { formatCliCommand } from "../cli/command-format.js";
-import type { OpenClawConfig } from "../config/config.js";
 import { note } from "../terminal/note.js";
 import { resolveUserPath } from "../utils.js";
 
@@ -25,8 +25,10 @@ export async function noteMemorySearchHealth(cfg: OpenClawConfig): Promise<void>
   // If a specific provider is configured (not "auto"), check only that one.
   if (resolved.provider !== "auto") {
     if (resolved.provider === "local") {
-      if (hasLocalEmbeddings(resolved.local)) {
-        return; // local model file exists
+      // QMD backend handles its own embeddings internally (e.g. embeddinggemma)
+      // — no OpenClaw-managed model file is needed, so skip the check.
+      if (cfg.memory?.backend === "qmd" || hasLocalEmbeddings(resolved.local)) {
+        return;
       }
       note(
         [
@@ -65,7 +67,7 @@ export async function noteMemorySearchHealth(cfg: OpenClawConfig): Promise<void>
   }
 
   // provider === "auto": check all providers in resolution order
-  if (hasLocalEmbeddings(resolved.local)) {
+  if (cfg.memory?.backend === "qmd" || hasLocalEmbeddings(resolved.local)) {
     return;
   }
   for (const provider of ["openai", "gemini", "voyage"] as const) {
