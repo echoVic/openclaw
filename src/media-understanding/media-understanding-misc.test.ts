@@ -12,7 +12,7 @@ describe("media understanding scope", () => {
   it("matches channel chatType explicitly", () => {
     const scope = {
       rules: [{ action: "deny", match: { chatType: "channel" } }],
-    } as Parameters<typeof resolveMediaUnderstandingScope>[0]["scope"];
+    } as const;
 
     expect(resolveMediaUnderstandingScope({ scope, chatType: "channel" })).toBe("deny");
   });

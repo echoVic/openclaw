@@ -7,7 +7,6 @@ import {
   parseAgentSessionKey,
 } from "../routing/session-key.js";
 import { resolveUserPath } from "../utils.js";
-import { normalizeSkillFilter } from "./skills/filter.js";
 import { resolveDefaultAgentWorkspaceDir } from "./workspace.js";
 
 export { resolveAgentIdFromSessionKey } from "../routing/session-key.js";
@@ -129,7 +128,12 @@ export function resolveAgentSkillsFilter(
   cfg: OpenClawConfig,
   agentId: string,
 ): string[] | undefined {
-  return normalizeSkillFilter(resolveAgentConfig(cfg, agentId)?.skills);
+  const raw = resolveAgentConfig(cfg, agentId)?.skills;
+  if (!raw) {
+    return undefined;
+  }
+  const normalized = raw.map((entry) => String(entry).trim()).filter(Boolean);
+  return normalized.length > 0 ? normalized : [];
 }
 
 export function resolveAgentModelPrimary(cfg: OpenClawConfig, agentId: string): string | undefined {

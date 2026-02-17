@@ -1,5 +1,4 @@
 import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
-import { Type } from "@sinclair/typebox";
 import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import {
@@ -8,12 +7,12 @@ import {
   resolveSubagentToolPolicy,
 } from "./pi-tools.policy.js";
 
-function createStubTool(name: string): AgentTool {
+function createStubTool(name: string): AgentTool<unknown, unknown> {
   return {
     name,
     label: name,
     description: "",
-    parameters: Type.Object({}),
+    parameters: {},
     execute: async () => ({}) as AgentToolResult<unknown>,
   };
 }

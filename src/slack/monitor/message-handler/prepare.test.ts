@@ -38,18 +38,14 @@ describe("slack prepareSlackMessage inbound contract", () => {
     }
   });
 
-  function createInboundSlackCtx(params: {
-    cfg: OpenClawConfig;
-    appClient?: App["client"];
-    defaultRequireMention?: boolean;
-    replyToMode?: "off" | "all";
-    channelsConfig?: Record<string, { systemPrompt: string }>;
-  }) {
-    return createSlackMonitorContext({
-      cfg: params.cfg,
+  function createDefaultSlackCtx() {
+    const slackCtx = createSlackMonitorContext({
+      cfg: {
+        channels: { slack: { enabled: true } },
+      } as OpenClawConfig,
       accountId: "default",
       botToken: "token",
-      app: { client: params.appClient ?? {} } as App,
+      app: { client: {} } as App,
       runtime: {} as RuntimeEnv,
       botUserId: "B1",
       teamId: "T1",
@@ -62,13 +58,12 @@ describe("slack prepareSlackMessage inbound contract", () => {
       allowFrom: [],
       groupDmEnabled: true,
       groupDmChannels: [],
-      defaultRequireMention: params.defaultRequireMention ?? true,
-      channelsConfig: params.channelsConfig,
+      defaultRequireMention: true,
       groupPolicy: "open",
       useAccessGroups: false,
       reactionMode: "off",
       reactionAllowlist: [],
-      replyToMode: params.replyToMode ?? "off",
+      replyToMode: "off",
       threadHistoryScope: "thread",
       threadInheritParent: false,
       slashCommand: {
@@ -81,14 +76,6 @@ describe("slack prepareSlackMessage inbound contract", () => {
       ackReactionScope: "group-mentions",
       mediaMaxBytes: 1024,
       removeAckAfterReply: false,
-    });
-  }
-
-  function createDefaultSlackCtx() {
-    const slackCtx = createInboundSlackCtx({
-      cfg: {
-        channels: { slack: { enabled: true } },
-      } as OpenClawConfig,
     });
     // oxlint-disable-next-line typescript/no-explicit-any
     slackCtx.resolveUserName = async () => ({ name: "Alice" }) as any;
@@ -112,46 +99,42 @@ describe("slack prepareSlackMessage inbound contract", () => {
     });
   }
 
-  function createSlackAccount(config: ResolvedSlackAccount["config"] = {}): ResolvedSlackAccount {
-    return {
-      accountId: "default",
-      enabled: true,
-      botTokenSource: "config",
-      appTokenSource: "config",
-      config,
-    };
-  }
-
-  function createSlackMessage(overrides: Partial<SlackMessageEvent>): SlackMessageEvent {
-    return {
-      channel: "D123",
-      channel_type: "im",
-      user: "U1",
-      text: "hi",
-      ts: "1.000",
-      ...overrides,
-    } as SlackMessageEvent;
-  }
-
-  async function prepareMessageWith(
-    ctx: SlackMonitorContext,
-    account: ResolvedSlackAccount,
-    message: SlackMessageEvent,
-  ) {
-    return prepareSlackMessage({
-      ctx,
-      account,
-      message,
-      opts: { source: "message" },
-    });
-  }
-
   function createThreadSlackCtx(params: { cfg: OpenClawConfig; replies: unknown }) {
-    return createInboundSlackCtx({
+    return createSlackMonitorContext({
       cfg: params.cfg,
-      appClient: { conversations: { replies: params.replies } } as App["client"],
+      accountId: "default",
+      botToken: "token",
+      app: { client: { conversations: { replies: params.replies } } } as App,
+      runtime: {} as RuntimeEnv,
+      botUserId: "B1",
+      teamId: "T1",
+      apiAppId: "A1",
+      historyLimit: 0,
+      sessionScope: "per-sender",
+      mainKey: "main",
+      dmEnabled: true,
+      dmPolicy: "open",
+      allowFrom: [],
+      groupDmEnabled: true,
+      groupDmChannels: [],
       defaultRequireMention: false,
+      groupPolicy: "open",
+      useAccessGroups: false,
+      reactionMode: "off",
+      reactionAllowlist: [],
       replyToMode: "all",
+      threadHistoryScope: "thread",
+      threadInheritParent: false,
+      slashCommand: {
+        enabled: false,
+        name: "openclaw",
+        sessionPrefix: "slack:slash",
+        ephemeral: true,
+      },
+      textLimit: 4000,
+      ackReactionScope: "group-mentions",
+      mediaMaxBytes: 1024,
+      removeAckAfterReply: false,
     });
   }
 
@@ -184,32 +167,8 @@ describe("slack prepareSlackMessage inbound contract", () => {
     expectInboundContextContract(prepared!.ctxPayload as any);
   });
 
-  it("includes forwarded shared attachment text in raw body", async () => {
-    const prepared = await prepareWithDefaultCtx(
-      createSlackMessage({
-        text: "",
-        attachments: [{ is_share: true, author_name: "Bob", text: "Forwarded hello" }],
-      }),
-    );
-
-    expect(prepared).toBeTruthy();
-    expect(prepared!.ctxPayload.RawBody).toContain("[Forwarded message from Bob]\nForwarded hello");
-  });
-
-  it("ignores non-forward attachments when no direct text/files are present", async () => {
-    const prepared = await prepareWithDefaultCtx(
-      createSlackMessage({
-        text: "",
-        files: [],
-        attachments: [{ is_msg_unfurl: true, text: "link unfurl text" }],
-      }),
-    );
-
-    expect(prepared).toBeNull();
-  });
-
   it("keeps channel metadata out of GroupSystemPrompt", async () => {
-    const slackCtx = createInboundSlackCtx({
+    const slackCtx = createSlackMonitorContext({
       cfg: {
         channels: {
           slack: {
@@ -217,10 +176,42 @@ describe("slack prepareSlackMessage inbound contract", () => {
           },
         },
       } as OpenClawConfig,
+      accountId: "default",
+      botToken: "token",
+      app: { client: {} } as App,
+      runtime: {} as RuntimeEnv,
+      botUserId: "B1",
+      teamId: "T1",
+      apiAppId: "A1",
+      historyLimit: 0,
+      sessionScope: "per-sender",
+      mainKey: "main",
+      dmEnabled: true,
+      dmPolicy: "open",
+      allowFrom: [],
+      groupDmEnabled: true,
+      groupDmChannels: [],
       defaultRequireMention: false,
       channelsConfig: {
         C123: { systemPrompt: "Config prompt" },
       },
+      groupPolicy: "open",
+      useAccessGroups: false,
+      reactionMode: "off",
+      reactionAllowlist: [],
+      replyToMode: "off",
+      threadHistoryScope: "thread",
+      threadInheritParent: false,
+      slashCommand: {
+        enabled: false,
+        name: "openclaw",
+        sessionPrefix: "slack:slash",
+        ephemeral: true,
+      },
+      textLimit: 4000,
+      ackReactionScope: "group-mentions",
+      mediaMaxBytes: 1024,
+      removeAckAfterReply: false,
     });
     // oxlint-disable-next-line typescript/no-explicit-any
     slackCtx.resolveUserName = async () => ({ name: "Alice" }) as any;
@@ -232,14 +223,28 @@ describe("slack prepareSlackMessage inbound contract", () => {
     };
     slackCtx.resolveChannelName = async () => channelInfo;
 
-    const prepared = await prepareMessageWith(
-      slackCtx,
-      createSlackAccount(),
-      createSlackMessage({
-        channel: "C123",
-        channel_type: "channel",
-      }),
-    );
+    const account: ResolvedSlackAccount = {
+      accountId: "default",
+      enabled: true,
+      botTokenSource: "config",
+      appTokenSource: "config",
+      config: {},
+    };
+
+    const message: SlackMessageEvent = {
+      channel: "C123",
+      channel_type: "channel",
+      user: "U1",
+      text: "hi",
+      ts: "1.000",
+    } as SlackMessageEvent;
+
+    const prepared = await prepareSlackMessage({
+      ctx: slackCtx,
+      account,
+      message,
+      opts: { source: "message" },
+    });
 
     expect(prepared).toBeTruthy();
     expect(prepared!.ctxPayload.GroupSystemPrompt).toBe("Config prompt");
@@ -251,20 +256,69 @@ describe("slack prepareSlackMessage inbound contract", () => {
   });
 
   it("sets MessageThreadId for top-level messages when replyToMode=all", async () => {
-    const slackCtx = createInboundSlackCtx({
+    const slackCtx = createSlackMonitorContext({
       cfg: {
         channels: { slack: { enabled: true, replyToMode: "all" } },
       } as OpenClawConfig,
+      accountId: "default",
+      botToken: "token",
+      app: { client: {} } as App,
+      runtime: {} as RuntimeEnv,
+      botUserId: "B1",
+      teamId: "T1",
+      apiAppId: "A1",
+      historyLimit: 0,
+      sessionScope: "per-sender",
+      mainKey: "main",
+      dmEnabled: true,
+      dmPolicy: "open",
+      allowFrom: [],
+      groupDmEnabled: true,
+      groupDmChannels: [],
+      defaultRequireMention: true,
+      groupPolicy: "open",
+      useAccessGroups: false,
+      reactionMode: "off",
+      reactionAllowlist: [],
       replyToMode: "all",
+      threadHistoryScope: "thread",
+      threadInheritParent: false,
+      slashCommand: {
+        enabled: false,
+        name: "openclaw",
+        sessionPrefix: "slack:slash",
+        ephemeral: true,
+      },
+      textLimit: 4000,
+      ackReactionScope: "group-mentions",
+      mediaMaxBytes: 1024,
+      removeAckAfterReply: false,
     });
     // oxlint-disable-next-line typescript/no-explicit-any
     slackCtx.resolveUserName = async () => ({ name: "Alice" }) as any;
 
-    const prepared = await prepareMessageWith(
-      slackCtx,
-      createSlackAccount({ replyToMode: "all" }),
-      createSlackMessage({}),
-    );
+    const account: ResolvedSlackAccount = {
+      accountId: "default",
+      enabled: true,
+      botTokenSource: "config",
+      appTokenSource: "config",
+      config: { replyToMode: "all" },
+    };
+
+    const message: SlackMessageEvent = {
+      channel: "D123",
+      channel_type: "im",
+      user: "U1",
+      text: "hi",
+      ts: "1.000",
+    } as SlackMessageEvent;
+
+    const prepared = await prepareSlackMessage({
+      ctx: slackCtx,
+      account,
+      message,
+      opts: { source: "message" },
+    });
 
     expect(prepared).toBeTruthy();
     expect(prepared!.ctxPayload.MessageThreadId).toBe("1.000");
@@ -298,17 +352,23 @@ describe("slack prepareSlackMessage inbound contract", () => {
     });
     slackCtx.resolveChannelName = async () => ({ name: "general", type: "channel" });
 
-    const prepared = await prepareMessageWith(
-      slackCtx,
-      createThreadAccount(),
-      createSlackMessage({
-        channel: "C123",
-        channel_type: "channel",
-        text: "current message",
-        ts: "101.000",
-        thread_ts: "100.000",
-      }),
-    );
+    const account = createThreadAccount();
+
+    const message: SlackMessageEvent = {
+      channel: "C123",
+      channel_type: "channel",
+      user: "U1",
+      text: "current message",
+      ts: "101.000",
+      thread_ts: "100.000",
+    } as SlackMessageEvent;
+
+    const prepared = await prepareSlackMessage({
+      ctx: slackCtx,
+      account,
+      message,
+      opts: { source: "message" },
+    });
 
     expect(prepared).toBeTruthy();
     expect(prepared!.ctxPayload.IsFirstThreadTurn).toBe(true);
@@ -347,17 +407,23 @@ describe("slack prepareSlackMessage inbound contract", () => {
     slackCtx.resolveUserName = async () => ({ name: "Alice" });
     slackCtx.resolveChannelName = async () => ({ name: "general", type: "channel" });
 
-    const prepared = await prepareMessageWith(
-      slackCtx,
-      createThreadAccount(),
-      createSlackMessage({
-        channel: "C123",
-        channel_type: "channel",
-        text: "reply in old thread",
-        ts: "201.000",
-        thread_ts: "200.000",
-      }),
-    );
+    const account = createThreadAccount();
+
+    const message: SlackMessageEvent = {
+      channel: "C123",
+      channel_type: "channel",
+      user: "U1",
+      text: "reply in old thread",
+      ts: "201.000",
+      thread_ts: "200.000",
+    } as SlackMessageEvent;
+
+    const prepared = await prepareSlackMessage({
+      ctx: slackCtx,
+      account,
+      message,
+      opts: { source: "message" },
+    });
 
     expect(prepared).toBeTruthy();
     expect(prepared!.ctxPayload.IsFirstThreadTurn).toBeUndefined();
@@ -365,12 +431,15 @@ describe("slack prepareSlackMessage inbound contract", () => {
   });
 
   it("includes thread_ts and parent_user_id metadata in thread replies", async () => {
-    const message = createSlackMessage({
+    const message: SlackMessageEvent = {
+      channel: "D123",
+      channel_type: "im",
+      user: "U1",
       text: "this is a reply",
       ts: "1.002",
       thread_ts: "1.000",
       parent_user_id: "U2",
-    });
+    } as SlackMessageEvent;
 
     const prepared = await prepareWithDefaultCtx(message);
 
@@ -382,7 +451,13 @@ describe("slack prepareSlackMessage inbound contract", () => {
   });
 
   it("excludes thread_ts from top-level messages", async () => {
-    const message = createSlackMessage({ text: "hello" });
+    const message: SlackMessageEvent = {
+      channel: "D123",
+      channel_type: "im",
+      user: "U1",
+      text: "hello",
+      ts: "1.000",
+    } as SlackMessageEvent;
 
     const prepared = await prepareWithDefaultCtx(message);
 
@@ -393,10 +468,14 @@ describe("slack prepareSlackMessage inbound contract", () => {
   });
 
   it("excludes thread metadata when thread_ts equals ts without parent_user_id", async () => {
-    const message = createSlackMessage({
+    const message: SlackMessageEvent = {
+      channel: "D123",
+      channel_type: "im",
+      user: "U1",
       text: "top level",
+      ts: "1.000",
       thread_ts: "1.000",
-    });
+    } as SlackMessageEvent;
 
     const prepared = await prepareWithDefaultCtx(message);
 
@@ -408,16 +487,11 @@ describe("slack prepareSlackMessage inbound contract", () => {
 });
 
 describe("prepareSlackMessage sender prefix", () => {
-  function createSenderPrefixCtx(params: {
-    channels: Record<string, unknown>;
-    allowFrom?: string[];
-    useAccessGroups?: boolean;
-    slashCommand: Record<string, unknown>;
-  }): SlackMonitorContext {
-    return {
+  it("prefixes channel bodies with sender label", async () => {
+    const ctx = {
       cfg: {
         agents: { defaults: { model: "anthropic/claude-opus-4-5", workspace: "/tmp/openclaw" } },
-        channels: { slack: params.channels },
+        channels: { slack: {} },
       },
       accountId: "default",
       botToken: "xoxb",
@@ -438,18 +512,97 @@ describe("prepareSlackMessage sender prefix", () => {
       mainKey: "agent:main:main",
       dmEnabled: true,
       dmPolicy: "open",
-      allowFrom: params.allowFrom ?? [],
+      allowFrom: [],
       groupDmEnabled: false,
       groupDmChannels: [],
       defaultRequireMention: true,
       groupPolicy: "open",
-      useAccessGroups: params.useAccessGroups ?? false,
+      useAccessGroups: false,
       reactionMode: "off",
       reactionAllowlist: [],
       replyToMode: "off",
       threadHistoryScope: "channel",
       threadInheritParent: false,
-      slashCommand: params.slashCommand,
+      slashCommand: { command: "/openclaw", enabled: true },
+      textLimit: 2000,
+      ackReactionScope: "off",
+      mediaMaxBytes: 1000,
+      removeAckAfterReply: false,
+      logger: { info: vi.fn(), warn: vi.fn() },
+      markMessageSeen: () => false,
+      shouldDropMismatchedSlackEvent: () => false,
+      resolveSlackSystemEventSessionKey: () => "agent:main:slack:channel:c1",
+      isChannelAllowed: () => true,
+      resolveChannelName: async () => ({
+        name: "general",
+        type: "channel",
+      }),
+      resolveUserName: async () => ({ name: "Alice" }),
+      setSlackThreadStatus: async () => undefined,
+    } satisfies SlackMonitorContext;
+
+    const result = await prepareSlackMessage({
+      ctx,
+      account: { accountId: "default", config: {} } as never,
+      message: {
+        type: "message",
+        channel: "C1",
+        channel_type: "channel",
+        text: "<@BOT> hello",
+        user: "U1",
+        ts: "1700000000.0001",
+        event_ts: "1700000000.0001",
+      } as never,
+      opts: { source: "message", wasMentioned: true },
+    });
+
+    expect(result).not.toBeNull();
+    const body = result?.ctxPayload.Body ?? "";
+    expect(body).toContain("Alice (U1): <@BOT> hello");
+  });
+
+  it("detects /new as control command when prefixed with Slack mention", async () => {
+    const ctx = {
+      cfg: {
+        agents: { defaults: { model: "anthropic/claude-opus-4-5", workspace: "/tmp/openclaw" } },
+        channels: { slack: { dm: { enabled: true, policy: "open", allowFrom: ["*"] } } },
+      },
+      accountId: "default",
+      botToken: "xoxb",
+      app: { client: {} },
+      runtime: {
+        log: vi.fn(),
+        error: vi.fn(),
+        exit: (code: number): never => {
+          throw new Error(`exit ${code}`);
+        },
+      },
+      botUserId: "BOT",
+      teamId: "T1",
+      apiAppId: "A1",
+      historyLimit: 0,
+      channelHistories: new Map(),
+      sessionScope: "per-sender",
+      mainKey: "agent:main:main",
+      dmEnabled: true,
+      dmPolicy: "open",
+      allowFrom: ["U1"],
+      groupDmEnabled: false,
+      groupDmChannels: [],
+      defaultRequireMention: true,
+      groupPolicy: "open",
+      useAccessGroups: true,
+      reactionMode: "off",
+      reactionAllowlist: [],
+      replyToMode: "off",
+      threadHistoryScope: "channel",
+      threadInheritParent: false,
+      slashCommand: {
+        enabled: false,
+        name: "openclaw",
+        sessionPrefix: "slack:slash",
+        ephemeral: true,
+      },
       textLimit: 2000,
       ackReactionScope: "off",
       mediaMaxBytes: 1000,
@@ -462,53 +615,22 @@ describe("prepareSlackMessage sender prefix", () => {
       resolveChannelName: async () => ({ name: "general", type: "channel" }),
       resolveUserName: async () => ({ name: "Alice" }),
       setSlackThreadStatus: async () => undefined,
-    } as unknown as SlackMonitorContext;
-  }
+    } satisfies SlackMonitorContext;
 
-  async function prepareSenderPrefixMessage(ctx: SlackMonitorContext, text: string, ts: string) {
-    return prepareSlackMessage({
+    const result = await prepareSlackMessage({
       ctx,
       account: { accountId: "default", config: {} } as never,
       message: {
         type: "message",
         channel: "C1",
         channel_type: "channel",
-        text,
+        text: "<@BOT> /new",
         user: "U1",
-        ts,
-        event_ts: ts,
+        ts: "1700000000.0002",
+        event_ts: "1700000000.0002",
       } as never,
       opts: { source: "message", wasMentioned: true },
     });
-  }
-
-  it("prefixes channel bodies with sender label", async () => {
-    const ctx = createSenderPrefixCtx({
-      channels: {},
-      slashCommand: { command: "/openclaw", enabled: true },
-    });
-
-    const result = await prepareSenderPrefixMessage(ctx, "<@BOT> hello", "1700000000.0001");
-
-    expect(result).not.toBeNull();
-    const body = result?.ctxPayload.Body ?? "";
-    expect(body).toContain("Alice (U1): <@BOT> hello");
-  });
-
-  it("detects /new as control command when prefixed with Slack mention", async () => {
-    const ctx = createSenderPrefixCtx({
-      channels: { dm: { enabled: true, policy: "open", allowFrom: ["*"] } },
-      allowFrom: ["U1"],
-      useAccessGroups: true,
-      slashCommand: {
-        enabled: false,
-        name: "openclaw",
-        sessionPrefix: "slack:slash",
-        ephemeral: true,
-      },
-    });
-
-    const result = await prepareSenderPrefixMessage(ctx, "<@BOT> /new", "1700000000.0002");
 
     expect(result).not.toBeNull();
     expect(result?.ctxPayload.CommandAuthorized).toBe(true);

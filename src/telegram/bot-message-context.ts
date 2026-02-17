@@ -48,7 +48,6 @@ import {
   buildTelegramGroupPeerId,
   buildTelegramParentPeer,
   buildTypingThreadParams,
-  resolveTelegramMediaPlaceholder,
   expandTextLinks,
   normalizeForwardedContext,
   describeReplyTarget,
@@ -57,7 +56,6 @@ import {
   resolveTelegramThreadSpec,
 } from "./bot/helpers.js";
 import type { StickerMetadata, TelegramContext } from "./bot/types.js";
-import { evaluateTelegramGroupBaseAccess } from "./group-access.js";
 
 export type TelegramMediaRef = {
   path: string;
@@ -194,31 +192,15 @@ export const buildTelegramMessageContext = async ({
     storeAllowFrom,
   });
   const hasGroupAllowOverride = typeof groupAllowOverride !== "undefined";
-  const senderId = msg.from?.id ? String(msg.from.id) : "";
-  const senderUsername = msg.from?.username ?? "";
-  const baseAccess = evaluateTelegramGroupBaseAccess({
-    isGroup,
-    groupConfig,
-    topicConfig,
-    hasGroupAllowOverride,
-    effectiveGroupAllow,
-    senderId,
-    senderUsername,
-    enforceAllowOverride: true,
-    requireSenderForAllowOverride: false,
-  });
-  if (!baseAccess.allowed) {
-    if (baseAccess.reason === "group-disabled") {
-      logVerbose(`Blocked telegram group ${chatId} (group disabled)`);
-      return null;
-    }
-    if (baseAccess.reason === "topic-disabled") {
-      logVerbose(
-        `Blocked telegram topic ${chatId} (${resolvedThreadId ?? "unknown"}) (topic disabled)`,
-      );
-      return null;
-    }
-    logVerbose(`Blocked telegram group sender ${senderId || "unknown"} (group allowFrom override)`);
+
+  if (isGroup && groupConfig?.enabled === false) {
+    logVerbose(`Blocked telegram group ${chatId} (group disabled)`);
+    return null;
+  }
+  if (isGroup && topicConfig?.enabled === false) {
+    logVerbose(
+      `Blocked telegram topic ${chatId} (${resolvedThreadId ?? "unknown"}) (topic disabled)`,
+    );
     return null;
   }
 
@@ -291,7 +273,6 @@ export const buildTelegramMessageContext = async ({
             const { code, created } = await upsertChannelPairingRequest({
               channel: "telegram",
               id: telegramUserId,
-              accountId: account.accountId,
               meta: {
                 username: from?.username,
                 firstName: from?.first_name,
@@ -338,6 +319,21 @@ export const buildTelegramMessageContext = async ({
   }
 
   const botUsername = primaryCtx.me?.username?.toLowerCase();
+  const senderId = msg.from?.id ? String(msg.from.id) : "";
+  const senderUsername = msg.from?.username ?? "";
+  if (isGroup && hasGroupAllowOverride) {
+    const allowed = isSenderAllowed({
+      allow: effectiveGroupAllow,
+      senderId,
+      senderUsername,
+    });
+    if (!allowed) {
+      logVerbose(
+        `Blocked telegram group sender ${senderId || "unknown"} (group allowFrom override)`,
+      );
+      return null;
+    }
+  }
   const allowForCommands = isGroup ? effectiveGroupAllow : effectiveDmAllow;
   const senderAllowedForCommands = isSenderAllowed({
     allow: allowForCommands,
@@ -357,7 +353,20 @@ export const buildTelegramMessageContext = async ({
   const commandAuthorized = commandGate.commandAuthorized;
   const historyKey = isGroup ? buildTelegramGroupPeerId(chatId, resolvedThreadId) : undefined;
 
-  let placeholder = resolveTelegramMediaPlaceholder(msg) ?? "";
+  let placeholder = "";
+  if (msg.photo) {
+    placeholder = "<media:image>";
+  } else if (msg.video) {
+    placeholder = "<media:video>";
+  } else if (msg.video_note) {
+    placeholder = "<media:video>";
+  } else if (msg.audio || msg.voice) {
+    placeholder = "<media:audio>";
+  } else if (msg.document) {
+    placeholder = "<media:document>";
+  } else if (msg.sticker) {
+    placeholder = "<media:sticker>";
+  }
 
   // Check if sticker has a cached description - if so, use it instead of sending the image
   const cachedStickerDescription = allMedia[0]?.stickerMetadata?.cachedDescription;

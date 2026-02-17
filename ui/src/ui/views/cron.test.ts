@@ -159,56 +159,37 @@ describe("cron view", () => {
     expect(summaries[1]).toBe("older run");
   });
 
-  it("shows webhook delivery option in the form", () => {
+  it("forwards notify checkbox updates from the form", () => {
     const container = document.createElement("div");
+    const onFormChange = vi.fn();
     render(
       renderCron(
         createProps({
-          form: { ...DEFAULT_CRON_FORM, payloadKind: "agentTurn" },
+          onFormChange,
         }),
       ),
       container,
     );
 
-    const options = Array.from(container.querySelectorAll("option")).map((opt) =>
-      (opt.textContent ?? "").trim(),
+    const notifyLabel = Array.from(container.querySelectorAll("label.field.checkbox")).find(
+      (label) => label.querySelector("span")?.textContent?.trim() === "Notify webhook",
     );
-    expect(options).toContain("Webhook POST");
+    const notifyInput =
+      notifyLabel?.querySelector<HTMLInputElement>('input[type="checkbox"]') ?? null;
+    expect(notifyInput).not.toBeNull();
+
+    if (!notifyInput) {
+      return;
+    }
+    notifyInput.checked = true;
+    notifyInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(onFormChange).toHaveBeenCalledWith({ notify: true });
   });
 
-  it("normalizes stale announce selection in the form when unsupported", () => {
+  it("shows notify chip for webhook-enabled jobs", () => {
     const container = document.createElement("div");
-    render(
-      renderCron(
-        createProps({
-          form: {
-            ...DEFAULT_CRON_FORM,
-            sessionTarget: "main",
-            payloadKind: "systemEvent",
-            deliveryMode: "announce",
-          },
-        }),
-      ),
-      container,
-    );
-
-    const options = Array.from(container.querySelectorAll("option")).map((opt) =>
-      (opt.textContent ?? "").trim(),
-    );
-    expect(options).not.toContain("Announce summary (default)");
-    expect(options).toContain("Webhook POST");
-    expect(options).toContain("None (internal)");
-    expect(container.querySelector('input[placeholder="https://example.invalid/cron"]')).toBeNull();
-  });
-
-  it("shows webhook delivery details for jobs", () => {
-    const container = document.createElement("div");
-    const job = {
-      ...createJob("job-2"),
-      sessionTarget: "isolated" as const,
-      payload: { kind: "agentTurn" as const, message: "do it" },
-      delivery: { mode: "webhook" as const, to: "https://example.invalid/cron" },
-    };
+    const job = { ...createJob("job-2"), notify: true };
     render(
       renderCron(
         createProps({
@@ -218,8 +199,9 @@ describe("cron view", () => {
       container,
     );
 
-    expect(container.textContent).toContain("Delivery");
-    expect(container.textContent).toContain("webhook");
-    expect(container.textContent).toContain("https://example.invalid/cron");
+    const chips = Array.from(container.querySelectorAll(".chip")).map((el) =>
+      (el.textContent ?? "").trim(),
+    );
+    expect(chips).toContain("notify");
   });
 });

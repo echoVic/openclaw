@@ -8,29 +8,6 @@ type TranscriptLine = {
   message?: Record<string, unknown>;
 };
 
-const sessionEntryState = vi.hoisted(() => ({
-  transcriptPath: "",
-  sessionId: "",
-}));
-
-vi.mock("../session-utils.js", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../session-utils.js")>();
-  return {
-    ...original,
-    loadSessionEntry: () => ({
-      cfg: {},
-      storePath: path.join(path.dirname(sessionEntryState.transcriptPath), "sessions.json"),
-      entry: {
-        sessionId: sessionEntryState.sessionId,
-        sessionFile: sessionEntryState.transcriptPath,
-      },
-      canonicalKey: "main",
-    }),
-  };
-});
-
-const { chatHandlers } = await import("./chat.js");
-
 function createActiveRun(sessionKey: string, sessionId: string) {
   const now = Date.now();
   return {
@@ -67,13 +44,29 @@ async function readTranscriptLines(transcriptPath: string): Promise<TranscriptLi
     });
 }
 
-function setMockSessionEntry(transcriptPath: string, sessionId: string) {
-  sessionEntryState.transcriptPath = transcriptPath;
-  sessionEntryState.sessionId = sessionId;
+async function importChatHandlersWithSession(transcriptPath: string, sessionId: string) {
+  vi.resetModules();
+  vi.doMock("../session-utils.js", async (importOriginal) => {
+    const original = await importOriginal();
+    return {
+      ...original,
+      loadSessionEntry: () => ({
+        cfg: {},
+        storePath: path.join(path.dirname(transcriptPath), "sessions.json"),
+        entry: {
+          sessionId,
+          sessionFile: transcriptPath,
+        },
+        canonicalKey: "main",
+      }),
+    };
+  });
+  return import("./chat.js");
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.resetModules();
 });
 
 describe("chat abort transcript persistence", () => {
@@ -84,7 +77,7 @@ describe("chat abort transcript persistence", () => {
     const runId = "idem-abort-run-1";
     await writeTranscriptHeader(transcriptPath, sessionId);
 
-    setMockSessionEntry(transcriptPath, sessionId);
+    const { chatHandlers } = await importChatHandlersWithSession(transcriptPath, sessionId);
     const respond = vi.fn();
     const context = {
       chatAbortControllers: new Map([[runId, createActiveRun("main", sessionId)]]),
@@ -107,9 +100,6 @@ describe("chat abort transcript persistence", () => {
       params: { sessionKey: "main", runId },
       respond,
       context: context as never,
-      req: {} as never,
-      client: null,
-      isWebchatConnect: () => false,
     });
 
     const [ok1, payload1] = respond.mock.calls.at(-1) ?? [];
@@ -124,9 +114,6 @@ describe("chat abort transcript persistence", () => {
       params: { sessionKey: "main", runId },
       respond,
       context: context as never,
-      req: {} as never,
-      client: null,
-      isWebchatConnect: () => false,
     });
 
     const lines = await readTranscriptLines(transcriptPath);
@@ -155,7 +142,7 @@ describe("chat abort transcript persistence", () => {
     const sessionId = "sess-main";
     await writeTranscriptHeader(transcriptPath, sessionId);
 
-    setMockSessionEntry(transcriptPath, sessionId);
+    const { chatHandlers } = await importChatHandlersWithSession(transcriptPath, sessionId);
     const respond = vi.fn();
     const context = {
       chatAbortControllers: new Map([
@@ -184,9 +171,6 @@ describe("chat abort transcript persistence", () => {
       params: { sessionKey: "main" },
       respond,
       context: context as never,
-      req: {} as never,
-      client: null,
-      isWebchatConnect: () => false,
     });
 
     const [ok, payload] = respond.mock.calls.at(-1) ?? [];
@@ -219,7 +203,7 @@ describe("chat abort transcript persistence", () => {
     const sessionId = "sess-main";
     await writeTranscriptHeader(transcriptPath, sessionId);
 
-    setMockSessionEntry(transcriptPath, sessionId);
+    const { chatHandlers } = await importChatHandlersWithSession(transcriptPath, sessionId);
     const respond = vi.fn();
     const context = {
       chatAbortControllers: new Map([["run-stop-1", createActiveRun("main", sessionId)]]),
@@ -244,9 +228,7 @@ describe("chat abort transcript persistence", () => {
       },
       respond,
       context: context as never,
-      req: {} as never,
-      client: null,
-      isWebchatConnect: () => false,
+      client: undefined,
     });
 
     const [ok, payload] = respond.mock.calls.at(-1) ?? [];

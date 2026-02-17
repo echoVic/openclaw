@@ -42,17 +42,11 @@ export async function createChildAdapter(params: {
 
   const stdinMode = params.stdinMode ?? (params.input !== undefined ? "pipe-closed" : "inherit");
 
-  // On Windows, `detached: true` creates a new process group and can prevent
-  // stdout/stderr pipes from connecting when running under a Scheduled Task
-  // (headless, no console). Default to `detached: false` on Windows; on
-  // POSIX systems keep `detached: true` so the child survives parent exit.
-  const useDetached = process.platform !== "win32";
-
   const options: SpawnOptions = {
     cwd: params.cwd,
     env: params.env ? toStringEnv(params.env) : undefined,
     stdio: ["pipe", "pipe", "pipe"],
-    detached: useDetached,
+    detached: true,
     windowsHide: true,
     windowsVerbatimArguments: params.windowsVerbatimArguments,
   };
@@ -65,14 +59,12 @@ export async function createChildAdapter(params: {
   const spawned = await spawnWithFallback({
     argv: resolvedArgv,
     options,
-    fallbacks: useDetached
-      ? [
-          {
-            label: "no-detach",
-            options: { detached: false },
-          },
-        ]
-      : [],
+    fallbacks: [
+      {
+        label: "no-detach",
+        options: { detached: false },
+      },
+    ],
   });
 
   const child = spawned.child as ChildProcessWithoutNullStreams;

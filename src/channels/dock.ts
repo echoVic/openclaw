@@ -218,17 +218,7 @@ const DOCKS: Record<ChatChannelId, ChannelDock> = {
           String(entry),
         );
       },
-      formatAllowFrom: ({ allowFrom }) =>
-        allowFrom
-          .map((entry) => String(entry).trim())
-          .filter(Boolean)
-          .map((entry) =>
-            entry
-              .replace(/^discord:/i, "")
-              .replace(/^user:/i, "")
-              .replace(/^pk:/i, "")
-              .toLowerCase(),
-          ),
+      formatAllowFrom: ({ allowFrom }) => formatLower(allowFrom),
     },
     groups: {
       resolveRequireMention: resolveDiscordGroupRequireMention,

@@ -142,7 +142,7 @@ describe("model-selection", () => {
       const cfg: Partial<OpenClawConfig> = {
         agents: {
           defaults: {
-            model: { primary: "claude-3-5-sonnet" },
+            model: "claude-3-5-sonnet",
           },
         },
       };

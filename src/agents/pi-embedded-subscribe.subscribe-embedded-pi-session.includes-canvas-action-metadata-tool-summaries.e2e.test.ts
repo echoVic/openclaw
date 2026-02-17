@@ -1,17 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSubscribedSessionHarness } from "./pi-embedded-subscribe.e2e-harness.js";
+import { subscribeEmbeddedPiSession } from "./pi-embedded-subscribe.js";
+
+type StubSession = {
+  subscribe: (fn: (evt: unknown) => void) => () => void;
+};
 
 describe("subscribeEmbeddedPiSession", () => {
   it("includes canvas action metadata in tool summaries", async () => {
+    let handler: ((evt: unknown) => void) | undefined;
+    const session: StubSession = {
+      subscribe: (fn) => {
+        handler = fn;
+        return () => {};
+      },
+    };
+
     const onToolResult = vi.fn();
 
-    const toolHarness = createSubscribedSessionHarness({
+    subscribeEmbeddedPiSession({
+      session: session as unknown as Parameters<typeof subscribeEmbeddedPiSession>[0]["session"],
       runId: "run-canvas-tool",
       verboseLevel: "on",
       onToolResult,
     });
 
-    toolHarness.emit({
+    handler?.({
       type: "tool_execution_start",
       toolName: "canvas",
       toolCallId: "tool-canvas-1",
@@ -29,15 +42,24 @@ describe("subscribeEmbeddedPiSession", () => {
     expect(payload.text).toContain("/tmp/a2ui.jsonl");
   });
   it("skips tool summaries when shouldEmitToolResult is false", () => {
+    let handler: ((evt: unknown) => void) | undefined;
+    const session: StubSession = {
+      subscribe: (fn) => {
+        handler = fn;
+        return () => {};
+      },
+    };
+
     const onToolResult = vi.fn();
 
-    const toolHarness = createSubscribedSessionHarness({
+    subscribeEmbeddedPiSession({
+      session: session as unknown as Parameters<typeof subscribeEmbeddedPiSession>[0]["session"],
       runId: "run-tool-off",
       shouldEmitToolResult: () => false,
       onToolResult,
     });
 
-    toolHarness.emit({
+    handler?.({
       type: "tool_execution_start",
       toolName: "read",
       toolCallId: "tool-2",
@@ -47,16 +69,25 @@ describe("subscribeEmbeddedPiSession", () => {
     expect(onToolResult).not.toHaveBeenCalled();
   });
   it("emits tool summaries when shouldEmitToolResult overrides verbose", async () => {
+    let handler: ((evt: unknown) => void) | undefined;
+    const session: StubSession = {
+      subscribe: (fn) => {
+        handler = fn;
+        return () => {};
+      },
+    };
+
     const onToolResult = vi.fn();
 
-    const toolHarness = createSubscribedSessionHarness({
+    subscribeEmbeddedPiSession({
+      session: session as unknown as Parameters<typeof subscribeEmbeddedPiSession>[0]["session"],
       runId: "run-tool-override",
       verboseLevel: "off",
       shouldEmitToolResult: () => true,
       onToolResult,
     });
 
-    toolHarness.emit({
+    handler?.({
       type: "tool_execution_start",
       toolName: "read",
       toolCallId: "tool-3",

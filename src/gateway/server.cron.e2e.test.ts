@@ -83,11 +83,11 @@ describe("gateway server cron", () => {
       const addRes = await rpcReq(ws, "cron.add", {
         name: "daily",
         enabled: true,
+        notify: true,
         schedule: { kind: "every", everyMs: 60_000 },
         sessionTarget: "main",
         wakeMode: "next-heartbeat",
         payload: { kind: "systemEvent", text: "hello" },
-        delivery: { mode: "webhook", to: "https://example.invalid/cron-finished" },
       });
       expect(addRes.ok).toBe(true);
       expect(typeof (addRes.payload as { id?: unknown } | null)?.id).toBe("string");
@@ -101,8 +101,8 @@ describe("gateway server cron", () => {
       expect((jobs as unknown[]).length).toBe(1);
       expect(((jobs as Array<{ name?: unknown }>)[0]?.name as string) ?? "").toBe("daily");
       expect(
-        ((jobs as Array<{ delivery?: { mode?: unknown } }>)[0]?.delivery?.mode as string) ?? "",
-      ).toBe("webhook");
+        ((jobs as Array<{ notify?: unknown }>)[0]?.notify as boolean | undefined) ?? false,
+      ).toBe(true);
 
       const routeAtMs = Date.now() - 1;
       const routeRes = await rpcReq(ws, "cron.add", {
@@ -423,31 +423,14 @@ describe("gateway server cron", () => {
     }
   }, 45_000);
 
-  test("posts webhooks for delivery mode and legacy notify fallback only when summary exists", async () => {
+  test("posts webhooks only when notify is true and summary exists", async () => {
     const prevSkipCron = process.env.OPENCLAW_SKIP_CRON;
     process.env.OPENCLAW_SKIP_CRON = "0";
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-gw-cron-webhook-"));
     testState.cronStorePath = path.join(dir, "cron", "jobs.json");
     testState.cronEnabled = false;
     await fs.mkdir(path.dirname(testState.cronStorePath), { recursive: true });
-
-    const legacyNotifyJob = {
-      id: "legacy-notify-job",
-      name: "legacy notify job",
-      enabled: true,
-      notify: true,
-      createdAtMs: Date.now(),
-      updatedAtMs: Date.now(),
-      schedule: { kind: "every", everyMs: 60_000 },
-      sessionTarget: "main",
-      wakeMode: "next-heartbeat",
-      payload: { kind: "systemEvent", text: "legacy webhook" },
-      state: {},
-    };
-    await fs.writeFile(
-      testState.cronStorePath,
-      JSON.stringify({ version: 1, jobs: [legacyNotifyJob] }),
-    );
+    await fs.writeFile(testState.cronStorePath, JSON.stringify({ version: 1, jobs: [] }));
 
     const configPath = process.env.OPENCLAW_CONFIG_PATH;
     expect(typeof configPath).toBe("string");
@@ -457,7 +440,7 @@ describe("gateway server cron", () => {
       JSON.stringify(
         {
           cron: {
-            webhook: "https://legacy.example.invalid/cron-finished",
+            webhook: "https://example.invalid/cron-finished",
             webhookToken: "cron-webhook-token",
           },
         },
@@ -474,25 +457,14 @@ describe("gateway server cron", () => {
     await connectOk(ws);
 
     try {
-      const invalidWebhookRes = await rpcReq(ws, "cron.add", {
-        name: "invalid webhook",
-        enabled: true,
-        schedule: { kind: "every", everyMs: 60_000 },
-        sessionTarget: "main",
-        wakeMode: "next-heartbeat",
-        payload: { kind: "systemEvent", text: "invalid" },
-        delivery: { mode: "webhook", to: "ftp://example.invalid/cron-finished" },
-      });
-      expect(invalidWebhookRes.ok).toBe(false);
-
       const notifyRes = await rpcReq(ws, "cron.add", {
-        name: "webhook enabled",
+        name: "notify true",
         enabled: true,
+        notify: true,
         schedule: { kind: "every", everyMs: 60_000 },
         sessionTarget: "main",
         wakeMode: "next-heartbeat",
         payload: { kind: "systemEvent", text: "send webhook" },
-        delivery: { mode: "webhook", to: "https://example.invalid/cron-finished" },
       });
       expect(notifyRes.ok).toBe(true);
       const notifyJobIdValue = (notifyRes.payload as { id?: unknown } | null)?.id;
@@ -503,7 +475,7 @@ describe("gateway server cron", () => {
       expect(notifyRunRes.ok).toBe(true);
 
       await waitForCondition(() => fetchMock.mock.calls.length === 1, 5000);
-      const [notifyUrl, notifyInit] = fetchMock.mock.calls[0] as unknown as [
+      const [notifyUrl, notifyInit] = fetchMock.mock.calls[0] as [
         string,
         {
           method?: string;
@@ -519,32 +491,10 @@ describe("gateway server cron", () => {
       expect(notifyBody.action).toBe("finished");
       expect(notifyBody.jobId).toBe(notifyJobId);
 
-      const legacyRunRes = await rpcReq(
-        ws,
-        "cron.run",
-        { id: "legacy-notify-job", mode: "force" },
-        20_000,
-      );
-      expect(legacyRunRes.ok).toBe(true);
-      await waitForCondition(() => fetchMock.mock.calls.length === 2, 5000);
-      const [legacyUrl, legacyInit] = fetchMock.mock.calls[1] as unknown as [
-        string,
-        {
-          method?: string;
-          headers?: Record<string, string>;
-          body?: string;
-        },
-      ];
-      expect(legacyUrl).toBe("https://legacy.example.invalid/cron-finished");
-      expect(legacyInit.method).toBe("POST");
-      expect(legacyInit.headers?.Authorization).toBe("Bearer cron-webhook-token");
-      const legacyBody = JSON.parse(legacyInit.body ?? "{}");
-      expect(legacyBody.action).toBe("finished");
-      expect(legacyBody.jobId).toBe("legacy-notify-job");
-
       const silentRes = await rpcReq(ws, "cron.add", {
-        name: "webhook disabled",
+        name: "notify false",
         enabled: true,
+        notify: false,
         schedule: { kind: "every", everyMs: 60_000 },
         sessionTarget: "main",
         wakeMode: "next-heartbeat",
@@ -559,17 +509,17 @@ describe("gateway server cron", () => {
       expect(silentRunRes.ok).toBe(true);
       await yieldToEventLoop();
       await yieldToEventLoop();
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
 
-      cronIsolatedRun.mockResolvedValueOnce({ status: "ok", summary: "" });
+      cronIsolatedRun.mockResolvedValueOnce({ status: "ok" });
       const noSummaryRes = await rpcReq(ws, "cron.add", {
-        name: "webhook no summary",
+        name: "notify no summary",
         enabled: true,
+        notify: true,
         schedule: { kind: "every", everyMs: 60_000 },
         sessionTarget: "isolated",
         wakeMode: "next-heartbeat",
         payload: { kind: "agentTurn", message: "test" },
-        delivery: { mode: "webhook", to: "https://example.invalid/cron-finished" },
       });
       expect(noSummaryRes.ok).toBe(true);
       const noSummaryJobIdValue = (noSummaryRes.payload as { id?: unknown } | null)?.id;
@@ -585,7 +535,7 @@ describe("gateway server cron", () => {
       expect(noSummaryRunRes.ok).toBe(true);
       await yieldToEventLoop();
       await yieldToEventLoop();
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       ws.close();
       await server.close();

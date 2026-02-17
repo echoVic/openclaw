@@ -12,46 +12,9 @@ import {
 
 describe("web monitor inbox", () => {
   installWebMonitorInboxUnitTestHooks();
-  type InboxOnMessage = NonNullable<Parameters<typeof monitorWebInbox>[0]["onMessage"]>;
 
   async function tick() {
     await new Promise((resolve) => setImmediate(resolve));
-  }
-
-  async function startInboxMonitor(onMessage: InboxOnMessage) {
-    const listener = await monitorWebInbox({
-      verbose: false,
-      onMessage,
-      accountId: DEFAULT_ACCOUNT_ID,
-      authDir: getAuthDir(),
-    });
-    return { listener, sock: getSock() };
-  }
-
-  function buildMessageUpsert(params: {
-    id: string;
-    remoteJid: string;
-    text: string;
-    timestamp: number;
-    pushName?: string;
-    participant?: string;
-  }) {
-    return {
-      type: "notify",
-      messages: [
-        {
-          key: {
-            id: params.id,
-            fromMe: false,
-            remoteJid: params.remoteJid,
-            participant: params.participant,
-          },
-          message: { conversation: params.text },
-          messageTimestamp: params.timestamp,
-          pushName: params.pushName,
-        },
-      ],
-    };
   }
 
   async function expectQuotedReplyContext(quotedMessage: unknown) {
@@ -59,7 +22,8 @@ describe("web monitor inbox", () => {
       await msg.reply("pong");
     });
 
-    const { listener, sock } = await startInboxMonitor(onMessage);
+    const listener = await monitorWebInbox({ verbose: false, onMessage });
+    const sock = getSock();
     const upsert = {
       type: "notify",
       messages: [
@@ -104,15 +68,25 @@ describe("web monitor inbox", () => {
       await msg.reply("pong");
     });
 
-    const { listener, sock } = await startInboxMonitor(onMessage);
-    expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("available");
-    const upsert = buildMessageUpsert({
-      id: "abc",
-      remoteJid: "999@s.whatsapp.net",
-      text: "ping",
-      timestamp: 1_700_000_000,
-      pushName: "Tester",
+    const listener = await monitorWebInbox({
+      verbose: false,
+      onMessage,
+      accountId: DEFAULT_ACCOUNT_ID,
+      authDir: getAuthDir(),
     });
+    const sock = getSock();
+    expect(sock.sendPresenceUpdate).toHaveBeenCalledWith("available");
+    const upsert = {
+      type: "notify",
+      messages: [
+        {
+          key: { id: "abc", fromMe: false, remoteJid: "999@s.whatsapp.net" },
+          message: { conversation: "ping" },
+          messageTimestamp: 1_700_000_000,
+          pushName: "Tester",
+        },
+      ],
+    };
 
     sock.ev.emit("messages.upsert", upsert);
     await tick();
@@ -142,14 +116,24 @@ describe("web monitor inbox", () => {
       return;
     });
 
-    const { listener, sock } = await startInboxMonitor(onMessage);
-    const upsert = buildMessageUpsert({
-      id: "abc",
-      remoteJid: "999@s.whatsapp.net",
-      text: "ping",
-      timestamp: 1_700_000_000,
-      pushName: "Tester",
+    const listener = await monitorWebInbox({
+      verbose: false,
+      onMessage,
+      accountId: DEFAULT_ACCOUNT_ID,
+      authDir: getAuthDir(),
     });
+    const sock = getSock();
+    const upsert = {
+      type: "notify",
+      messages: [
+        {
+          key: { id: "abc", fromMe: false, remoteJid: "999@s.whatsapp.net" },
+          message: { conversation: "ping" },
+          messageTimestamp: 1_700_000_000,
+          pushName: "Tester",
+        },
+      ],
+    };
 
     sock.ev.emit("messages.upsert", upsert);
     sock.ev.emit("messages.upsert", upsert);
@@ -165,16 +149,26 @@ describe("web monitor inbox", () => {
       return;
     });
 
-    const { listener, sock } = await startInboxMonitor(onMessage);
+    const listener = await monitorWebInbox({
+      verbose: false,
+      onMessage,
+      accountId: DEFAULT_ACCOUNT_ID,
+      authDir: getAuthDir(),
+    });
+    const sock = getSock();
     const getPNForLID = vi.spyOn(sock.signalRepository.lidMapping, "getPNForLID");
     sock.signalRepository.lidMapping.getPNForLID.mockResolvedValueOnce("999:0@s.whatsapp.net");
-    const upsert = buildMessageUpsert({
-      id: "abc",
-      remoteJid: "999@lid",
-      text: "ping",
-      timestamp: 1_700_000_000,
-      pushName: "Tester",
-    });
+    const upsert = {
+      type: "notify",
+      messages: [
+        {
+          key: { id: "abc", fromMe: false, remoteJid: "999@lid" },
+          message: { conversation: "ping" },
+          messageTimestamp: 1_700_000_000,
+          pushName: "Tester",
+        },
+      ],
+    };
 
     sock.ev.emit("messages.upsert", upsert);
     await tick();
@@ -196,15 +190,25 @@ describe("web monitor inbox", () => {
       JSON.stringify("1555"),
     );
 
-    const { listener, sock } = await startInboxMonitor(onMessage);
-    const getPNForLID = vi.spyOn(sock.signalRepository.lidMapping, "getPNForLID");
-    const upsert = buildMessageUpsert({
-      id: "abc",
-      remoteJid: "555@lid",
-      text: "ping",
-      timestamp: 1_700_000_000,
-      pushName: "Tester",
+    const listener = await monitorWebInbox({
+      verbose: false,
+      onMessage,
+      accountId: DEFAULT_ACCOUNT_ID,
+      authDir: getAuthDir(),
     });
+    const sock = getSock();
+    const getPNForLID = vi.spyOn(sock.signalRepository.lidMapping, "getPNForLID");
+    const upsert = {
+      type: "notify",
+      messages: [
+        {
+          key: { id: "abc", fromMe: false, remoteJid: "555@lid" },
+          message: { conversation: "ping" },
+          messageTimestamp: 1_700_000_000,
+          pushName: "Tester",
+        },
+      ],
+    };
 
     sock.ev.emit("messages.upsert", upsert);
     await tick();
@@ -222,16 +226,30 @@ describe("web monitor inbox", () => {
       return;
     });
 
-    const { listener, sock } = await startInboxMonitor(onMessage);
+    const listener = await monitorWebInbox({
+      verbose: false,
+      onMessage,
+      accountId: DEFAULT_ACCOUNT_ID,
+      authDir: getAuthDir(),
+    });
+    const sock = getSock();
     const getPNForLID = vi.spyOn(sock.signalRepository.lidMapping, "getPNForLID");
     sock.signalRepository.lidMapping.getPNForLID.mockResolvedValueOnce("444:0@s.whatsapp.net");
-    const upsert = buildMessageUpsert({
-      id: "abc",
-      remoteJid: "123@g.us",
-      participant: "444@lid",
-      text: "ping",
-      timestamp: 1_700_000_000,
-    });
+    const upsert = {
+      type: "notify",
+      messages: [
+        {
+          key: {
+            id: "abc",
+            fromMe: false,
+            remoteJid: "123@g.us",
+            participant: "444@lid",
+          },
+          message: { conversation: "ping" },
+          messageTimestamp: 1_700_000_000,
+        },
+      ],
+    };
 
     sock.ev.emit("messages.upsert", upsert);
     await tick();
@@ -259,7 +277,13 @@ describe("web monitor inbox", () => {
       }
     });
 
-    const { listener, sock } = await startInboxMonitor(onMessage);
+    const listener = await monitorWebInbox({
+      verbose: false,
+      onMessage,
+      accountId: DEFAULT_ACCOUNT_ID,
+      authDir: getAuthDir(),
+    });
+    const sock = getSock();
     const upsert = {
       type: "notify",
       messages: [
@@ -281,7 +305,7 @@ describe("web monitor inbox", () => {
 
     expect(onMessage).toHaveBeenCalledTimes(2);
 
-    (resolveFirst as (() => void) | null)?.();
+    resolveFirst?.();
     await listener.close();
   });
 

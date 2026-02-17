@@ -125,21 +125,6 @@ function createErrnoError(code: string) {
   return err;
 }
 
-function mockWorkspaceStateRead(params: { onboardingCompletedAt?: string; errorCode?: string }) {
-  mocks.fsReadFile.mockImplementation(async (...args: unknown[]) => {
-    const filePath = args[0];
-    if (String(filePath).endsWith("workspace-state.json")) {
-      if (params.errorCode) {
-        throw createErrnoError(params.errorCode);
-      }
-      return JSON.stringify({
-        onboardingCompletedAt: params.onboardingCompletedAt ?? "2026-02-15T14:00:00.000Z",
-      });
-    }
-    throw createEnoentError();
-  });
-}
-
 beforeEach(() => {
   mocks.fsReadFile.mockImplementation(async () => {
     throw createEnoentError();
@@ -428,7 +413,14 @@ describe("agents.files.list", () => {
   });
 
   it("hides BOOTSTRAP.md when workspace onboarding is complete", async () => {
-    mockWorkspaceStateRead({ onboardingCompletedAt: "2026-02-15T14:00:00.000Z" });
+    mocks.fsReadFile.mockImplementation(async (filePath: string | URL | number) => {
+      if (String(filePath).endsWith("workspace-state.json")) {
+        return JSON.stringify({
+          onboardingCompletedAt: "2026-02-15T14:00:00.000Z",
+        });
+      }
+      throw createEnoentError();
+    });
 
     const { respond, promise } = makeCall("agents.files.list", { agentId: "main" });
     await promise;
@@ -439,7 +431,12 @@ describe("agents.files.list", () => {
   });
 
   it("falls back to showing BOOTSTRAP.md when workspace state cannot be read", async () => {
-    mockWorkspaceStateRead({ errorCode: "EACCES" });
+    mocks.fsReadFile.mockImplementation(async (filePath: string | URL | number) => {
+      if (String(filePath).endsWith("workspace-state.json")) {
+        throw createErrnoError("EACCES");
+      }
+      throw createEnoentError();
+    });
 
     const { respond, promise } = makeCall("agents.files.list", { agentId: "main" });
     await promise;

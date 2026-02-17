@@ -213,8 +213,7 @@ describe("sessions_send gating", () => {
       timeoutSeconds: 0,
     });
 
-    expect(callGatewayMock).toHaveBeenCalledTimes(1);
-    expect(callGatewayMock.mock.calls[0]?.[0]).toMatchObject({ method: "sessions.list" });
+    expect(callGatewayMock).not.toHaveBeenCalled();
     expect(result.details).toMatchObject({ status: "forbidden" });
   });
 });

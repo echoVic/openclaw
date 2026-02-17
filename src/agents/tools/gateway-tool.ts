@@ -138,24 +138,6 @@ export function createGatewayTool(opts?: {
           : undefined;
       const gatewayOpts = { gatewayUrl, gatewayToken, timeoutMs };
 
-      const resolveGatewayWriteMeta = (): {
-        sessionKey: string | undefined;
-        note: string | undefined;
-        restartDelayMs: number | undefined;
-      } => {
-        const sessionKey =
-          typeof params.sessionKey === "string" && params.sessionKey.trim()
-            ? params.sessionKey.trim()
-            : opts?.agentSessionKey?.trim() || undefined;
-        const note =
-          typeof params.note === "string" && params.note.trim() ? params.note.trim() : undefined;
-        const restartDelayMs =
-          typeof params.restartDelayMs === "number" && Number.isFinite(params.restartDelayMs)
-            ? Math.floor(params.restartDelayMs)
-            : undefined;
-        return { sessionKey, note, restartDelayMs };
-      };
-
       const resolveConfigWriteParams = async (): Promise<{
         raw: string;
         baseHash: string;
@@ -172,7 +154,17 @@ export function createGatewayTool(opts?: {
         if (!baseHash) {
           throw new Error("Missing baseHash from config snapshot.");
         }
-        return { raw, baseHash, ...resolveGatewayWriteMeta() };
+        const sessionKey =
+          typeof params.sessionKey === "string" && params.sessionKey.trim()
+            ? params.sessionKey.trim()
+            : opts?.agentSessionKey?.trim() || undefined;
+        const note =
+          typeof params.note === "string" && params.note.trim() ? params.note.trim() : undefined;
+        const restartDelayMs =
+          typeof params.restartDelayMs === "number" && Number.isFinite(params.restartDelayMs)
+            ? Math.floor(params.restartDelayMs)
+            : undefined;
+        return { raw, baseHash, sessionKey, note, restartDelayMs };
       };
 
       if (action === "config.get") {
@@ -208,7 +200,16 @@ export function createGatewayTool(opts?: {
         return jsonResult({ ok: true, result });
       }
       if (action === "update.run") {
-        const { sessionKey, note, restartDelayMs } = resolveGatewayWriteMeta();
+        const sessionKey =
+          typeof params.sessionKey === "string" && params.sessionKey.trim()
+            ? params.sessionKey.trim()
+            : opts?.agentSessionKey?.trim() || undefined;
+        const note =
+          typeof params.note === "string" && params.note.trim() ? params.note.trim() : undefined;
+        const restartDelayMs =
+          typeof params.restartDelayMs === "number" && Number.isFinite(params.restartDelayMs)
+            ? Math.floor(params.restartDelayMs)
+            : undefined;
         const updateGatewayOpts = {
           ...gatewayOpts,
           timeoutMs: timeoutMs ?? DEFAULT_UPDATE_TIMEOUT_MS,

@@ -2,7 +2,6 @@ import { parseFrontmatterBlock } from "../markdown/frontmatter.js";
 import {
   getFrontmatterString,
   normalizeStringList,
-  parseOpenClawManifestInstallBase,
   parseFrontmatterBool,
   resolveOpenClawManifestBlock,
   resolveOpenClawManifestInstall,
@@ -22,23 +21,30 @@ export function parseFrontmatter(content: string): ParsedHookFrontmatter {
 }
 
 function parseInstallSpec(input: unknown): HookInstallSpec | undefined {
-  const parsed = parseOpenClawManifestInstallBase(input, ["bundled", "npm", "git"]);
-  if (!parsed) {
+  if (!input || typeof input !== "object") {
     return undefined;
   }
-  const { raw } = parsed;
+  const raw = input as Record<string, unknown>;
+  const kindRaw =
+    typeof raw.kind === "string" ? raw.kind : typeof raw.type === "string" ? raw.type : "";
+  const kind = kindRaw.trim().toLowerCase();
+  if (kind !== "bundled" && kind !== "npm" && kind !== "git") {
+    return undefined;
+  }
+
   const spec: HookInstallSpec = {
-    kind: parsed.kind as HookInstallSpec["kind"],
+    kind: kind,
   };
 
-  if (parsed.id) {
-    spec.id = parsed.id;
+  if (typeof raw.id === "string") {
+    spec.id = raw.id;
   }
-  if (parsed.label) {
-    spec.label = parsed.label;
+  if (typeof raw.label === "string") {
+    spec.label = raw.label;
   }
-  if (parsed.bins) {
-    spec.bins = parsed.bins;
+  const bins = normalizeStringList(raw.bins);
+  if (bins.length > 0) {
+    spec.bins = bins;
   }
   if (typeof raw.package === "string") {
     spec.package = raw.package;

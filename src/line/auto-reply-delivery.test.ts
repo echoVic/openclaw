@@ -46,9 +46,9 @@ describe("deliverLineAutoReply", () => {
       pushMessageLine,
       pushTextMessageWithQuickReplies,
       createTextMessageWithQuickReplies,
-      createQuickReplyItems: createQuickReplyItems as LineAutoReplyDeps["createQuickReplyItems"],
+      createQuickReplyItems,
       pushMessagesLine,
-      createFlexMessage: createFlexMessage as LineAutoReplyDeps["createFlexMessage"],
+      createFlexMessage,
       createImageMessage,
       createLocationMessage,
       ...overrides,
@@ -146,8 +146,7 @@ describe("deliverLineAutoReply", () => {
       quickReplies: ["A"],
     };
     const { deps, pushMessagesLine, replyMessageLine } = createDeps({
-      createTextMessageWithQuickReplies:
-        createTextMessageWithQuickReplies as LineAutoReplyDeps["createTextMessageWithQuickReplies"],
+      createTextMessageWithQuickReplies,
     });
 
     await deliverLineAutoReply({

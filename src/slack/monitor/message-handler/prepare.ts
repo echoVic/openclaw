@@ -43,7 +43,6 @@ import { resolveSlackChannelConfig } from "../channel-config.js";
 import { stripSlackMentionsForCommandDetection } from "../commands.js";
 import { normalizeSlackChannelType, type SlackMonitorContext } from "../context.js";
 import {
-  resolveSlackAttachmentContent,
   resolveSlackMedia,
   resolveSlackThreadHistory,
   resolveSlackThreadStarter,
@@ -343,25 +342,8 @@ export async function prepareSlackMessage(params: {
     token: ctx.botToken,
     maxBytes: ctx.mediaMaxBytes,
   });
-
-  // Resolve forwarded message content (text + media) from Slack attachments
-  const attachmentContent = await resolveSlackAttachmentContent({
-    attachments: message.attachments,
-    token: ctx.botToken,
-    maxBytes: ctx.mediaMaxBytes,
-  });
-
-  // Merge forwarded media into the message's media array
-  const mergedMedia = [...(media ?? []), ...(attachmentContent?.media ?? [])];
-  const effectiveDirectMedia = mergedMedia.length > 0 ? mergedMedia : null;
-
-  const mediaPlaceholder = effectiveDirectMedia
-    ? effectiveDirectMedia.map((m) => m.placeholder).join(" ")
-    : undefined;
-  const rawBody =
-    [(message.text ?? "").trim(), attachmentContent?.text, mediaPlaceholder]
-      .filter(Boolean)
-      .join("\n") || "";
+  const mediaPlaceholder = media ? media.map((m) => m.placeholder).join(" ") : undefined;
+  const rawBody = (message.text ?? "").trim() || mediaPlaceholder || "";
   if (!rawBody) {
     return null;
   }
@@ -496,7 +478,7 @@ export async function prepareSlackMessage(params: {
       const snippet = starter.text.replace(/\s+/g, " ").slice(0, 80);
       threadLabel = `Slack thread ${roomLabel}${snippet ? `: ${snippet}` : ""}`;
       // If current message has no files but thread starter does, fetch starter's files
-      if (!effectiveDirectMedia && starter.files && starter.files.length > 0) {
+      if (!media && starter.files && starter.files.length > 0) {
         threadStarterMedia = await resolveSlackMedia({
           files: starter.files,
           token: ctx.botToken,
@@ -572,8 +554,8 @@ export async function prepareSlackMessage(params: {
     }
   }
 
-  // Use direct media (including forwarded attachment media) if available, else thread starter media
-  const effectiveMedia = effectiveDirectMedia ?? threadStarterMedia;
+  // Use thread starter media if current message has none
+  const effectiveMedia = media ?? threadStarterMedia;
   const firstMedia = effectiveMedia?.[0];
 
   const inboundHistory =

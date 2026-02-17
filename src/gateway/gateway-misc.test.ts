@@ -1,6 +1,11 @@
+import fs from "node:fs/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it, test, vi } from "vitest";
 import { defaultVoiceWakeTriggers } from "../infra/voicewake.js";
 import { GatewayClient } from "./client.js";
+import { handleControlUiHttpRequest } from "./control-ui.js";
 import {
   DEFAULT_DANGEROUS_NODE_COMMANDS,
   resolveNodeCommandAllowlist,
@@ -36,10 +41,49 @@ describe("GatewayClient", () => {
     wsMockState.last = null;
     const client = new GatewayClient({ url: "ws://127.0.0.1:1" });
     client.start();
-    const last = wsMockState.last as { url: unknown; opts: unknown } | null;
 
-    expect(last?.url).toBe("ws://127.0.0.1:1");
-    expect(last?.opts).toEqual(expect.objectContaining({ maxPayload: 25 * 1024 * 1024 }));
+    expect(wsMockState.last?.url).toBe("ws://127.0.0.1:1");
+    expect(wsMockState.last?.opts).toEqual(
+      expect.objectContaining({ maxPayload: 25 * 1024 * 1024 }),
+    );
+  });
+});
+
+const makeControlUiResponse = (): {
+  res: ServerResponse;
+  setHeader: ReturnType<typeof vi.fn>;
+  end: ReturnType<typeof vi.fn>;
+} => {
+  const setHeader = vi.fn();
+  const end = vi.fn();
+  const res = {
+    headersSent: false,
+    statusCode: 200,
+    setHeader,
+    end,
+  } as unknown as ServerResponse;
+  return { res, setHeader, end };
+};
+
+describe("handleControlUiHttpRequest", () => {
+  it("sets anti-clickjacking headers for Control UI responses", async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-ui-"));
+    try {
+      await fs.writeFile(path.join(tmp, "index.html"), "<html></html>\n");
+      const { res, setHeader } = makeControlUiResponse();
+      const handled = handleControlUiHttpRequest(
+        { url: "/", method: "GET" } as IncomingMessage,
+        res,
+        {
+          root: { kind: "resolved", path: tmp },
+        },
+      );
+      expect(handled).toBe(true);
+      expect(setHeader).toHaveBeenCalledWith("X-Frame-Options", "DENY");
+      expect(setHeader).toHaveBeenCalledWith("Content-Security-Policy", "frame-ancestors 'none'");
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
   });
 });
 
@@ -152,8 +196,7 @@ describe("late-arriving invoke results", () => {
         context,
       });
 
-      const [ok, rawPayload, error] = respond.mock.lastCall ?? [];
-      const payload = rawPayload as { ok?: boolean; ignored?: boolean } | undefined;
+      const [ok, payload, error] = respond.mock.lastCall ?? [];
 
       // Late-arriving results return success instead of error to reduce log noise.
       expect(ok).toBe(true);

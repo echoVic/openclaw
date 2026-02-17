@@ -33,39 +33,6 @@ function writeStore(agentId: string, store: Record<string, unknown>) {
   fs.writeFileSync(storePath, JSON.stringify(store, null, 2), "utf-8");
 }
 
-function setSubagentLimits(subagents: Record<string, unknown>) {
-  configOverride = {
-    session: {
-      mainKey: "main",
-      scope: "per-sender",
-      store: storeTemplatePath,
-    },
-    agents: {
-      defaults: {
-        subagents,
-      },
-    },
-  };
-}
-
-function seedDepthTwoAncestryStore(params?: { sessionIds?: boolean }) {
-  const depth1 = "agent:main:subagent:depth-1";
-  const callerKey = "agent:main:subagent:depth-2";
-  writeStore("main", {
-    [depth1]: {
-      sessionId: params?.sessionIds ? "depth-1-session" : "depth-1",
-      updatedAt: Date.now(),
-      spawnedBy: "agent:main:main",
-    },
-    [callerKey]: {
-      sessionId: params?.sessionIds ? "depth-2-session" : "depth-2",
-      updatedAt: Date.now(),
-      spawnedBy: depth1,
-    },
-  });
-  return { depth1, callerKey };
-}
-
 describe("sessions_spawn depth + child limits", () => {
   beforeEach(() => {
     resetSubagentRegistryForTests();
@@ -105,7 +72,20 @@ describe("sessions_spawn depth + child limits", () => {
   });
 
   it("allows depth-1 callers when maxSpawnDepth is 2", async () => {
-    setSubagentLimits({ maxSpawnDepth: 2 });
+    configOverride = {
+      session: {
+        mainKey: "main",
+        scope: "per-sender",
+        store: storeTemplatePath,
+      },
+      agents: {
+        defaults: {
+          subagents: {
+            maxSpawnDepth: 2,
+          },
+        },
+      },
+    };
 
     const tool = createSessionsSpawnTool({ agentSessionKey: "agent:main:subagent:parent" });
     const result = await tool.execute("call-depth-allow", { task: "hello" });
@@ -129,7 +109,20 @@ describe("sessions_spawn depth + child limits", () => {
   });
 
   it("rejects depth-2 callers when maxSpawnDepth is 2 (using stored spawnDepth on flat keys)", async () => {
-    setSubagentLimits({ maxSpawnDepth: 2 });
+    configOverride = {
+      session: {
+        mainKey: "main",
+        scope: "per-sender",
+        store: storeTemplatePath,
+      },
+      agents: {
+        defaults: {
+          subagents: {
+            maxSpawnDepth: 2,
+          },
+        },
+      },
+    };
 
     const callerKey = "agent:main:subagent:flat-depth-2";
     writeStore("main", {
@@ -150,8 +143,35 @@ describe("sessions_spawn depth + child limits", () => {
   });
 
   it("rejects depth-2 callers when spawnDepth is missing but spawnedBy ancestry implies depth 2", async () => {
-    setSubagentLimits({ maxSpawnDepth: 2 });
-    const { callerKey } = seedDepthTwoAncestryStore();
+    configOverride = {
+      session: {
+        mainKey: "main",
+        scope: "per-sender",
+        store: storeTemplatePath,
+      },
+      agents: {
+        defaults: {
+          subagents: {
+            maxSpawnDepth: 2,
+          },
+        },
+      },
+    };
+
+    const depth1 = "agent:main:subagent:depth-1";
+    const callerKey = "agent:main:subagent:depth-2";
+    writeStore("main", {
+      [depth1]: {
+        sessionId: "depth-1",
+        updatedAt: Date.now(),
+        spawnedBy: "agent:main:main",
+      },
+      [callerKey]: {
+        sessionId: "depth-2",
+        updatedAt: Date.now(),
+        spawnedBy: depth1,
+      },
+    });
 
     const tool = createSessionsSpawnTool({ agentSessionKey: callerKey });
     const result = await tool.execute("call-depth-ancestry-reject", { task: "hello" });
@@ -163,8 +183,35 @@ describe("sessions_spawn depth + child limits", () => {
   });
 
   it("rejects depth-2 callers when the requester key is a sessionId", async () => {
-    setSubagentLimits({ maxSpawnDepth: 2 });
-    seedDepthTwoAncestryStore({ sessionIds: true });
+    configOverride = {
+      session: {
+        mainKey: "main",
+        scope: "per-sender",
+        store: storeTemplatePath,
+      },
+      agents: {
+        defaults: {
+          subagents: {
+            maxSpawnDepth: 2,
+          },
+        },
+      },
+    };
+
+    const depth1 = "agent:main:subagent:depth-1";
+    const callerKey = "agent:main:subagent:depth-2";
+    writeStore("main", {
+      [depth1]: {
+        sessionId: "depth-1-session",
+        updatedAt: Date.now(),
+        spawnedBy: "agent:main:main",
+      },
+      [callerKey]: {
+        sessionId: "depth-2-session",
+        updatedAt: Date.now(),
+        spawnedBy: depth1,
+      },
+    });
 
     const tool = createSessionsSpawnTool({ agentSessionKey: "depth-2-session" });
     const result = await tool.execute("call-depth-sessionid-reject", { task: "hello" });

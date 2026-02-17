@@ -1,9 +1,7 @@
-import { vi } from "vitest";
 import { monitorWebChannel } from "./auto-reply.js";
 import {
   createWebInboundDeliverySpies,
   createWebListenerFactoryCapture,
-  sendWebDirectInboundMessage,
 } from "./auto-reply.test-harness.js";
 import type { WebInboundMessage } from "./inbound.js";
 
@@ -21,27 +19,4 @@ export async function monitorWebChannelWithCapture(resolver: unknown): Promise<{
   }
 
   return { spies, onMessage };
-}
-
-export async function sendWebDirectInboundAndCollectSessionKeys(): Promise<{
-  seen: string[];
-  resolver: ReturnType<typeof vi.fn>;
-}> {
-  const seen: string[] = [];
-  const resolver = vi.fn(async (ctx: { SessionKey?: unknown }) => {
-    seen.push(String(ctx.SessionKey));
-    return { text: "ok" };
-  });
-
-  const { spies, onMessage } = await monitorWebChannelWithCapture(resolver);
-  await sendWebDirectInboundMessage({
-    onMessage,
-    spies,
-    id: "m1",
-    from: "+1000",
-    to: "+2000",
-    body: "hello",
-  });
-
-  return { seen, resolver };
 }

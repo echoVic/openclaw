@@ -1,37 +1,21 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
-import { makeTempWorkspace } from "../test-helpers/workspace.js";
 import { captureEnv } from "../test-utils/env.js";
 import { MINIMAX_API_BASE_URL, MINIMAX_CN_API_BASE_URL } from "./onboard-auth.js";
-import {
-  createThrowingRuntime,
-  readJsonFile,
-  runNonInteractiveOnboardingWithDefaults,
-  type NonInteractiveRuntime,
-} from "./onboard-non-interactive.test-helpers.js";
 import { OPENAI_DEFAULT_MODEL } from "./openai-model-default.js";
+
+type RuntimeMock = {
+  log: () => void;
+  error: (msg: string) => never;
+  exit: (code: number) => never;
+};
 
 type OnboardEnv = {
   configPath: string;
-  runtime: NonInteractiveRuntime;
-};
-
-type ProviderAuthConfigSnapshot = {
-  auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
-  agents?: { defaults?: { model?: { primary?: string } } };
-  models?: {
-    providers?: Record<
-      string,
-      {
-        baseUrl?: string;
-        api?: string;
-        apiKey?: string;
-        models?: Array<{ id?: string }>;
-      }
-    >;
-  };
+  runtime: RuntimeMock;
 };
 
 async function removeDirWithRetry(dir: string): Promise<void> {
@@ -77,13 +61,21 @@ async function withOnboardEnv(
   delete process.env.OPENCLAW_GATEWAY_PASSWORD;
   delete process.env.CUSTOM_API_KEY;
 
-  const tempHome = await makeTempWorkspace(prefix);
+  const tempHome = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
   const configPath = path.join(tempHome, "openclaw.json");
   process.env.HOME = tempHome;
   process.env.OPENCLAW_STATE_DIR = tempHome;
   process.env.OPENCLAW_CONFIG_PATH = configPath;
 
-  const runtime = createThrowingRuntime();
+  const runtime: RuntimeMock = {
+    log: () => {},
+    error: (msg: string) => {
+      throw new Error(msg);
+    },
+    exit: (code: number) => {
+      throw new Error(`exit:${code}`);
+    },
+  };
 
   try {
     await run({ configPath, runtime });
@@ -93,37 +85,16 @@ async function withOnboardEnv(
   }
 }
 
-async function runOnboardingAndReadConfig(
-  env: OnboardEnv,
+async function runNonInteractive(
   options: Record<string, unknown>,
-): Promise<ProviderAuthConfigSnapshot> {
-  await runNonInteractiveOnboardingWithDefaults(env.runtime, {
-    skipSkills: true,
-    ...options,
-  });
-  return readJsonFile<ProviderAuthConfigSnapshot>(env.configPath);
-}
-
-const CUSTOM_LOCAL_BASE_URL = "https://models.custom.local/v1";
-const CUSTOM_LOCAL_MODEL_ID = "local-large";
-const CUSTOM_LOCAL_PROVIDER_ID = "custom-models-custom-local";
-
-async function runCustomLocalNonInteractive(
-  runtime: NonInteractiveRuntime,
-  overrides: Record<string, unknown> = {},
+  runtime: RuntimeMock,
 ): Promise<void> {
-  await runNonInteractiveOnboardingWithDefaults(runtime, {
-    authChoice: "custom-api-key",
-    customBaseUrl: CUSTOM_LOCAL_BASE_URL,
-    customModelId: CUSTOM_LOCAL_MODEL_ID,
-    skipSkills: true,
-    ...overrides,
-  });
+  const { runNonInteractiveOnboarding } = await import("./onboard-non-interactive.js");
+  await runNonInteractiveOnboarding(options, runtime);
 }
 
-async function readCustomLocalProviderApiKey(configPath: string): Promise<string | undefined> {
-  const cfg = await readJsonFile<ProviderAuthConfigSnapshot>(configPath);
-  return cfg.models?.providers?.[CUSTOM_LOCAL_PROVIDER_ID]?.apiKey;
+async function readJsonFile<T>(filePath: string): Promise<T> {
+  return JSON.parse(await fs.readFile(filePath, "utf8")) as T;
 }
 
 async function expectApiKeyProfile(params: {
@@ -147,11 +118,25 @@ async function expectApiKeyProfile(params: {
 
 describe("onboard (non-interactive): provider auth", () => {
   it("stores MiniMax API key and uses global baseUrl by default", async () => {
-    await withOnboardEnv("openclaw-onboard-minimax-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        authChoice: "minimax-api",
-        minimaxApiKey: "sk-minimax-test",
-      });
+    await withOnboardEnv("openclaw-onboard-minimax-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "minimax-api",
+          minimaxApiKey: "sk-minimax-test",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+        agents?: { defaults?: { model?: { primary?: string } } };
+        models?: { providers?: Record<string, { baseUrl?: string }> };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["minimax:default"]?.provider).toBe("minimax");
       expect(cfg.auth?.profiles?.["minimax:default"]?.mode).toBe("api_key");
@@ -166,11 +151,25 @@ describe("onboard (non-interactive): provider auth", () => {
   }, 60_000);
 
   it("supports MiniMax CN API endpoint auth choice", async () => {
-    await withOnboardEnv("openclaw-onboard-minimax-cn-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        authChoice: "minimax-api-key-cn",
-        minimaxApiKey: "sk-minimax-test",
-      });
+    await withOnboardEnv("openclaw-onboard-minimax-cn-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "minimax-api-key-cn",
+          minimaxApiKey: "sk-minimax-test",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+        agents?: { defaults?: { model?: { primary?: string } } };
+        models?: { providers?: Record<string, { baseUrl?: string }> };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["minimax-cn:default"]?.provider).toBe("minimax-cn");
       expect(cfg.auth?.profiles?.["minimax-cn:default"]?.mode).toBe("api_key");
@@ -185,11 +184,25 @@ describe("onboard (non-interactive): provider auth", () => {
   }, 60_000);
 
   it("stores Z.AI API key and uses global baseUrl by default", async () => {
-    await withOnboardEnv("openclaw-onboard-zai-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        authChoice: "zai-api-key",
-        zaiApiKey: "zai-test-key",
-      });
+    await withOnboardEnv("openclaw-onboard-zai-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "zai-api-key",
+          zaiApiKey: "zai-test-key",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+        agents?: { defaults?: { model?: { primary?: string } } };
+        models?: { providers?: Record<string, { baseUrl?: string }> };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["zai:default"]?.provider).toBe("zai");
       expect(cfg.auth?.profiles?.["zai:default"]?.mode).toBe("api_key");
@@ -200,11 +213,23 @@ describe("onboard (non-interactive): provider auth", () => {
   }, 60_000);
 
   it("supports Z.AI CN coding endpoint auth choice", async () => {
-    await withOnboardEnv("openclaw-onboard-zai-cn-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        authChoice: "zai-coding-cn",
-        zaiApiKey: "zai-test-key",
-      });
+    await withOnboardEnv("openclaw-onboard-zai-cn-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "zai-coding-cn",
+          zaiApiKey: "zai-test-key",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        models?: { providers?: Record<string, { baseUrl?: string }> };
+      }>(configPath);
 
       expect(cfg.models?.providers?.zai?.baseUrl).toBe(
         "https://open.bigmodel.cn/api/coding/paas/v4",
@@ -213,12 +238,25 @@ describe("onboard (non-interactive): provider auth", () => {
   }, 60_000);
 
   it("stores xAI API key and sets default model", async () => {
-    await withOnboardEnv("openclaw-onboard-xai-", async (env) => {
+    await withOnboardEnv("openclaw-onboard-xai-", async ({ configPath, runtime }) => {
       const rawKey = "xai-test-\r\nkey";
-      const cfg = await runOnboardingAndReadConfig(env, {
-        authChoice: "xai-api-key",
-        xaiApiKey: rawKey,
-      });
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "xai-api-key",
+          xaiApiKey: rawKey,
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+        agents?: { defaults?: { model?: { primary?: string } } };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["xai:default"]?.provider).toBe("xai");
       expect(cfg.auth?.profiles?.["xai:default"]?.mode).toBe("api_key");
@@ -228,11 +266,24 @@ describe("onboard (non-interactive): provider auth", () => {
   }, 60_000);
 
   it("stores Vercel AI Gateway API key and sets default model", async () => {
-    await withOnboardEnv("openclaw-onboard-ai-gateway-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        authChoice: "ai-gateway-api-key",
-        aiGatewayApiKey: "gateway-test-key",
-      });
+    await withOnboardEnv("openclaw-onboard-ai-gateway-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "ai-gateway-api-key",
+          aiGatewayApiKey: "gateway-test-key",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+        agents?: { defaults?: { model?: { primary?: string } } };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["vercel-ai-gateway:default"]?.provider).toBe("vercel-ai-gateway");
       expect(cfg.auth?.profiles?.["vercel-ai-gateway:default"]?.mode).toBe("api_key");
@@ -252,14 +303,23 @@ describe("onboard (non-interactive): provider auth", () => {
       const cleanToken = `sk-ant-oat01-${"a".repeat(80)}`;
       const token = `${cleanToken.slice(0, 30)}\r${cleanToken.slice(30)}`;
 
-      await runNonInteractiveOnboardingWithDefaults(runtime, {
-        authChoice: "token",
-        tokenProvider: "anthropic",
-        token,
-        tokenProfileId: "anthropic:default",
-      });
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "token",
+          tokenProvider: "anthropic",
+          token,
+          tokenProfileId: "anthropic:default",
+          skipHealth: true,
+          skipChannels: true,
+          json: true,
+        },
+        runtime,
+      );
 
-      const cfg = await readJsonFile<ProviderAuthConfigSnapshot>(configPath);
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["anthropic:default"]?.provider).toBe("anthropic");
       expect(cfg.auth?.profiles?.["anthropic:default"]?.mode).toBe("token");
@@ -276,11 +336,23 @@ describe("onboard (non-interactive): provider auth", () => {
   }, 60_000);
 
   it("stores OpenAI API key and sets OpenAI default model", async () => {
-    await withOnboardEnv("openclaw-onboard-openai-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        authChoice: "openai-api-key",
-        openaiApiKey: "sk-openai-test",
-      });
+    await withOnboardEnv("openclaw-onboard-openai-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "openai-api-key",
+          openaiApiKey: "sk-openai-test",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        agents?: { defaults?: { model?: { primary?: string } } };
+      }>(configPath);
 
       expect(cfg.agents?.defaults?.model?.primary).toBe(OPENAI_DEFAULT_MODEL);
     });
@@ -289,20 +361,40 @@ describe("onboard (non-interactive): provider auth", () => {
   it("rejects vLLM auth choice in non-interactive mode", async () => {
     await withOnboardEnv("openclaw-onboard-vllm-non-interactive-", async ({ runtime }) => {
       await expect(
-        runNonInteractiveOnboardingWithDefaults(runtime, {
-          authChoice: "vllm",
-          skipSkills: true,
-        }),
+        runNonInteractive(
+          {
+            nonInteractive: true,
+            authChoice: "vllm",
+            skipHealth: true,
+            skipChannels: true,
+            skipSkills: true,
+            json: true,
+          },
+          runtime,
+        ),
       ).rejects.toThrow('Auth choice "vllm" requires interactive mode.');
     });
   }, 60_000);
 
   it("stores LiteLLM API key and sets default model", async () => {
-    await withOnboardEnv("openclaw-onboard-litellm-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        authChoice: "litellm-api-key",
-        litellmApiKey: "litellm-test-key",
-      });
+    await withOnboardEnv("openclaw-onboard-litellm-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "litellm-api-key",
+          litellmApiKey: "litellm-test-key",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+        agents?: { defaults?: { model?: { primary?: string } } };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["litellm:default"]?.provider).toBe("litellm");
       expect(cfg.auth?.profiles?.["litellm:default"]?.mode).toBe("api_key");
@@ -332,15 +424,25 @@ describe("onboard (non-interactive): provider auth", () => {
     "$name",
     async ({ prefix, options }) => {
       await withOnboardEnv(prefix, async ({ configPath, runtime }) => {
-        await runNonInteractiveOnboardingWithDefaults(runtime, {
-          cloudflareAiGatewayAccountId: "cf-account-id",
-          cloudflareAiGatewayGatewayId: "cf-gateway-id",
-          cloudflareAiGatewayApiKey: "cf-gateway-test-key",
-          skipSkills: true,
-          ...options,
-        });
+        await runNonInteractive(
+          {
+            nonInteractive: true,
+            cloudflareAiGatewayAccountId: "cf-account-id",
+            cloudflareAiGatewayGatewayId: "cf-gateway-id",
+            cloudflareAiGatewayApiKey: "cf-gateway-test-key",
+            skipHealth: true,
+            skipChannels: true,
+            skipSkills: true,
+            json: true,
+            ...options,
+          },
+          runtime,
+        );
 
-        const cfg = await readJsonFile<ProviderAuthConfigSnapshot>(configPath);
+        const cfg = await readJsonFile<{
+          auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+          agents?: { defaults?: { model?: { primary?: string } } };
+        }>(configPath);
 
         expect(cfg.auth?.profiles?.["cloudflare-ai-gateway:default"]?.provider).toBe(
           "cloudflare-ai-gateway",
@@ -361,10 +463,23 @@ describe("onboard (non-interactive): provider auth", () => {
   );
 
   it("infers Together auth choice from --together-api-key and sets default model", async () => {
-    await withOnboardEnv("openclaw-onboard-together-infer-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        togetherApiKey: "together-test-key",
-      });
+    await withOnboardEnv("openclaw-onboard-together-infer-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          togetherApiKey: "together-test-key",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+        agents?: { defaults?: { model?: { primary?: string } } };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["together:default"]?.provider).toBe("together");
       expect(cfg.auth?.profiles?.["together:default"]?.mode).toBe("api_key");
@@ -378,10 +493,23 @@ describe("onboard (non-interactive): provider auth", () => {
   }, 60_000);
 
   it("infers QIANFAN auth choice from --qianfan-api-key and sets default model", async () => {
-    await withOnboardEnv("openclaw-onboard-qianfan-infer-", async (env) => {
-      const cfg = await runOnboardingAndReadConfig(env, {
-        qianfanApiKey: "qianfan-test-key",
-      });
+    await withOnboardEnv("openclaw-onboard-qianfan-infer-", async ({ configPath, runtime }) => {
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          qianfanApiKey: "qianfan-test-key",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
+
+      const cfg = await readJsonFile<{
+        auth?: { profiles?: Record<string, { provider?: string; mode?: string }> };
+        agents?: { defaults?: { model?: { primary?: string } } };
+      }>(configPath);
 
       expect(cfg.auth?.profiles?.["qianfan:default"]?.provider).toBe("qianfan");
       expect(cfg.auth?.profiles?.["qianfan:default"]?.mode).toBe("api_key");
@@ -396,16 +524,36 @@ describe("onboard (non-interactive): provider auth", () => {
 
   it("configures a custom provider from non-interactive flags", async () => {
     await withOnboardEnv("openclaw-onboard-custom-provider-", async ({ configPath, runtime }) => {
-      await runNonInteractiveOnboardingWithDefaults(runtime, {
-        authChoice: "custom-api-key",
-        customBaseUrl: "https://llm.example.com/v1",
-        customApiKey: "custom-test-key",
-        customModelId: "foo-large",
-        customCompatibility: "anthropic",
-        skipSkills: true,
-      });
+      await runNonInteractive(
+        {
+          nonInteractive: true,
+          authChoice: "custom-api-key",
+          customBaseUrl: "https://llm.example.com/v1",
+          customApiKey: "custom-test-key",
+          customModelId: "foo-large",
+          customCompatibility: "anthropic",
+          skipHealth: true,
+          skipChannels: true,
+          skipSkills: true,
+          json: true,
+        },
+        runtime,
+      );
 
-      const cfg = await readJsonFile<ProviderAuthConfigSnapshot>(configPath);
+      const cfg = await readJsonFile<{
+        models?: {
+          providers?: Record<
+            string,
+            {
+              baseUrl?: string;
+              api?: string;
+              apiKey?: string;
+              models?: Array<{ id?: string }>;
+            }
+          >;
+        };
+        agents?: { defaults?: { model?: { primary?: string } } };
+      }>(configPath);
 
       const provider = cfg.models?.providers?.["custom-llm-example-com"];
       expect(provider?.baseUrl).toBe("https://llm.example.com/v1");
@@ -420,14 +568,32 @@ describe("onboard (non-interactive): provider auth", () => {
     await withOnboardEnv(
       "openclaw-onboard-custom-provider-infer-",
       async ({ configPath, runtime }) => {
-        await runNonInteractiveOnboardingWithDefaults(runtime, {
-          customBaseUrl: "https://models.custom.local/v1",
-          customModelId: "local-large",
-          customApiKey: "custom-test-key",
-          skipSkills: true,
-        });
+        await runNonInteractive(
+          {
+            nonInteractive: true,
+            customBaseUrl: "https://models.custom.local/v1",
+            customModelId: "local-large",
+            customApiKey: "custom-test-key",
+            skipHealth: true,
+            skipChannels: true,
+            skipSkills: true,
+            json: true,
+          },
+          runtime,
+        );
 
-        const cfg = await readJsonFile<ProviderAuthConfigSnapshot>(configPath);
+        const cfg = await readJsonFile<{
+          models?: {
+            providers?: Record<
+              string,
+              {
+                baseUrl?: string;
+                api?: string;
+              }
+            >;
+          };
+          agents?: { defaults?: { model?: { primary?: string } } };
+        }>(configPath);
 
         expect(cfg.models?.providers?.["custom-models-custom-local"]?.baseUrl).toBe(
           "https://models.custom.local/v1",
@@ -445,8 +611,35 @@ describe("onboard (non-interactive): provider auth", () => {
       "openclaw-onboard-custom-provider-env-fallback-",
       async ({ configPath, runtime }) => {
         process.env.CUSTOM_API_KEY = "custom-env-key";
-        await runCustomLocalNonInteractive(runtime);
-        expect(await readCustomLocalProviderApiKey(configPath)).toBe("custom-env-key");
+
+        await runNonInteractive(
+          {
+            nonInteractive: true,
+            authChoice: "custom-api-key",
+            customBaseUrl: "https://models.custom.local/v1",
+            customModelId: "local-large",
+            skipHealth: true,
+            skipChannels: true,
+            skipSkills: true,
+            json: true,
+          },
+          runtime,
+        );
+
+        const cfg = await readJsonFile<{
+          models?: {
+            providers?: Record<
+              string,
+              {
+                apiKey?: string;
+              }
+            >;
+          };
+        }>(configPath);
+
+        expect(cfg.models?.providers?.["custom-models-custom-local"]?.apiKey).toBe(
+          "custom-env-key",
+        );
       },
     );
   }, 60_000);
@@ -457,15 +650,42 @@ describe("onboard (non-interactive): provider auth", () => {
       async ({ configPath, runtime }) => {
         const { upsertAuthProfile } = await import("../agents/auth-profiles.js");
         upsertAuthProfile({
-          profileId: `${CUSTOM_LOCAL_PROVIDER_ID}:default`,
+          profileId: "custom-models-custom-local:default",
           credential: {
             type: "api_key",
-            provider: CUSTOM_LOCAL_PROVIDER_ID,
+            provider: "custom-models-custom-local",
             key: "custom-profile-key",
           },
         });
-        await runCustomLocalNonInteractive(runtime);
-        expect(await readCustomLocalProviderApiKey(configPath)).toBe("custom-profile-key");
+
+        await runNonInteractive(
+          {
+            nonInteractive: true,
+            authChoice: "custom-api-key",
+            customBaseUrl: "https://models.custom.local/v1",
+            customModelId: "local-large",
+            skipHealth: true,
+            skipChannels: true,
+            skipSkills: true,
+            json: true,
+          },
+          runtime,
+        );
+
+        const cfg = await readJsonFile<{
+          models?: {
+            providers?: Record<
+              string,
+              {
+                apiKey?: string;
+              }
+            >;
+          };
+        }>(configPath);
+
+        expect(cfg.models?.providers?.["custom-models-custom-local"]?.apiKey).toBe(
+          "custom-profile-key",
+        );
       },
     );
   }, 60_000);
@@ -475,13 +695,20 @@ describe("onboard (non-interactive): provider auth", () => {
       "openclaw-onboard-custom-provider-invalid-compat-",
       async ({ runtime }) => {
         await expect(
-          runNonInteractiveOnboardingWithDefaults(runtime, {
-            authChoice: "custom-api-key",
-            customBaseUrl: "https://models.custom.local/v1",
-            customModelId: "local-large",
-            customCompatibility: "xmlrpc",
-            skipSkills: true,
-          }),
+          runNonInteractive(
+            {
+              nonInteractive: true,
+              authChoice: "custom-api-key",
+              customBaseUrl: "https://models.custom.local/v1",
+              customModelId: "local-large",
+              customCompatibility: "xmlrpc",
+              skipHealth: true,
+              skipChannels: true,
+              skipSkills: true,
+              json: true,
+            },
+            runtime,
+          ),
         ).rejects.toThrow('Invalid --custom-compatibility (use "openai" or "anthropic").');
       },
     );
@@ -490,13 +717,20 @@ describe("onboard (non-interactive): provider auth", () => {
   it("fails custom provider auth when explicit provider id is invalid", async () => {
     await withOnboardEnv("openclaw-onboard-custom-provider-invalid-id-", async ({ runtime }) => {
       await expect(
-        runNonInteractiveOnboardingWithDefaults(runtime, {
-          authChoice: "custom-api-key",
-          customBaseUrl: "https://models.custom.local/v1",
-          customModelId: "local-large",
-          customProviderId: "!!!",
-          skipSkills: true,
-        }),
+        runNonInteractive(
+          {
+            nonInteractive: true,
+            authChoice: "custom-api-key",
+            customBaseUrl: "https://models.custom.local/v1",
+            customModelId: "local-large",
+            customProviderId: "!!!",
+            skipHealth: true,
+            skipChannels: true,
+            skipSkills: true,
+            json: true,
+          },
+          runtime,
+        ),
       ).rejects.toThrow(
         "Invalid custom provider config: Custom provider ID must include letters, numbers, or hyphens.",
       );
@@ -508,10 +742,17 @@ describe("onboard (non-interactive): provider auth", () => {
       "openclaw-onboard-custom-provider-missing-required-",
       async ({ runtime }) => {
         await expect(
-          runNonInteractiveOnboardingWithDefaults(runtime, {
-            customApiKey: "custom-test-key",
-            skipSkills: true,
-          }),
+          runNonInteractive(
+            {
+              nonInteractive: true,
+              customApiKey: "custom-test-key",
+              skipHealth: true,
+              skipChannels: true,
+              skipSkills: true,
+              json: true,
+            },
+            runtime,
+          ),
         ).rejects.toThrow('Auth choice "custom-api-key" requires a base URL and model ID.');
       },
     );

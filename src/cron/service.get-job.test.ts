@@ -17,7 +17,7 @@ function createCronService(storePath: string) {
     log: logger,
     enqueueSystemEvent: vi.fn(),
     requestHeartbeatNow: vi.fn(),
-    runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" as const })),
+    runIsolatedAgentJob: vi.fn(async () => ({ status: "ok" })),
   });
 }
 
@@ -44,25 +44,42 @@ describe("CronService.getJob", () => {
     }
   });
 
-  it("preserves webhook delivery on create", async () => {
+  it("preserves notify on create for true, false, and omitted", async () => {
     const { storePath } = await makeStorePath();
     const cron = createCronService(storePath);
     await cron.start();
 
     try {
-      const webhookJob = await cron.add({
-        name: "webhook-job",
+      const notifyTrue = await cron.add({
+        name: "notify-true",
+        enabled: true,
+        notify: true,
+        schedule: { kind: "every", everyMs: 60_000 },
+        sessionTarget: "main",
+        wakeMode: "next-heartbeat",
+        payload: { kind: "systemEvent", text: "ping" },
+      });
+      const notifyFalse = await cron.add({
+        name: "notify-false",
+        enabled: true,
+        notify: false,
+        schedule: { kind: "every", everyMs: 60_000 },
+        sessionTarget: "main",
+        wakeMode: "next-heartbeat",
+        payload: { kind: "systemEvent", text: "ping" },
+      });
+      const notifyOmitted = await cron.add({
+        name: "notify-omitted",
         enabled: true,
         schedule: { kind: "every", everyMs: 60_000 },
         sessionTarget: "main",
         wakeMode: "next-heartbeat",
         payload: { kind: "systemEvent", text: "ping" },
-        delivery: { mode: "webhook", to: "https://example.invalid/cron" },
       });
-      expect(cron.getJob(webhookJob.id)?.delivery).toEqual({
-        mode: "webhook",
-        to: "https://example.invalid/cron",
-      });
+
+      expect(cron.getJob(notifyTrue.id)?.notify).toBe(true);
+      expect(cron.getJob(notifyFalse.id)?.notify).toBe(false);
+      expect(cron.getJob(notifyOmitted.id)?.notify).toBeUndefined();
     } finally {
       cron.stop();
     }

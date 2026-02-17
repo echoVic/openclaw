@@ -5,8 +5,6 @@ import { captureEnv } from "../test-utils/env.js";
 import { resolveOpenClawAgentDir } from "./agent-paths.js";
 import {
   installModelsConfigTestHooks,
-  mockCopilotTokenExchangeSuccess,
-  withUnsetCopilotTokenEnv,
   withModelsTempHome as withTempHome,
 } from "./models-config.e2e-harness.js";
 import { ensureOpenClawModelsJson } from "./models-config.js";
@@ -16,8 +14,22 @@ installModelsConfigTestHooks({ restoreFetch: true });
 describe("models-config", () => {
   it("uses the first github-copilot profile when env tokens are missing", async () => {
     await withTempHome(async (home) => {
-      await withUnsetCopilotTokenEnv(async () => {
-        const fetchMock = mockCopilotTokenExchangeSuccess();
+      const envSnapshot = captureEnv(["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"]);
+      delete process.env.COPILOT_GITHUB_TOKEN;
+      delete process.env.GH_TOKEN;
+      delete process.env.GITHUB_TOKEN;
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          token: "copilot-token;proxy-ep=proxy.copilot.example",
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+        }),
+      });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      try {
         const agentDir = path.join(home, "agent-profiles");
         await fs.mkdir(agentDir, { recursive: true });
         await fs.writeFile(
@@ -47,7 +59,9 @@ describe("models-config", () => {
 
         const [, opts] = fetchMock.mock.calls[0] as [string, { headers?: Record<string, string> }];
         expect(opts?.headers?.Authorization).toBe("Bearer alpha-token");
-      });
+      } finally {
+        envSnapshot.restore();
+      }
     });
   });
 

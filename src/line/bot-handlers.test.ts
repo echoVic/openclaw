@@ -43,8 +43,8 @@ const { buildLineMessageContextMock, buildLinePostbackContextMock } = vi.hoisted
 }));
 
 vi.mock("./bot-message-context.js", () => ({
-  buildLineMessageContext: buildLineMessageContextMock,
-  buildLinePostbackContext: buildLinePostbackContextMock,
+  buildLineMessageContext: (...args: unknown[]) => buildLineMessageContextMock(...args),
+  buildLinePostbackContext: (...args: unknown[]) => buildLinePostbackContextMock(...args),
   getLineSourceInfo: (source: {
     type?: string;
     userId?: string;
@@ -65,11 +65,9 @@ const { readAllowFromStoreMock, upsertPairingRequestMock } = vi.hoisted(() => ({
 
 let handleLineWebhookEvents: typeof import("./bot-handlers.js").handleLineWebhookEvents;
 
-const createRuntime = () => ({ log: vi.fn(), error: vi.fn(), exit: vi.fn() });
-
 vi.mock("../pairing/pairing-store.js", () => ({
-  readChannelAllowFromStore: readAllowFromStoreMock,
-  upsertChannelPairingRequest: upsertPairingRequestMock,
+  readChannelAllowFromStore: (...args: unknown[]) => readAllowFromStoreMock(...args),
+  upsertChannelPairingRequest: (...args: unknown[]) => upsertPairingRequestMock(...args),
 }));
 
 describe("handleLineWebhookEvents", () => {
@@ -107,7 +105,7 @@ describe("handleLineWebhookEvents", () => {
         tokenSource: "config",
         config: { groupPolicy: "disabled" },
       },
-      runtime: createRuntime(),
+      runtime: { error: vi.fn() },
       mediaMaxBytes: 1,
       processMessage,
     });
@@ -139,7 +137,7 @@ describe("handleLineWebhookEvents", () => {
         tokenSource: "config",
         config: { groupPolicy: "allowlist" },
       },
-      runtime: createRuntime(),
+      runtime: { error: vi.fn() },
       mediaMaxBytes: 1,
       processMessage,
     });
@@ -173,7 +171,7 @@ describe("handleLineWebhookEvents", () => {
         tokenSource: "config",
         config: { groupPolicy: "allowlist", groupAllowFrom: ["user-3"] },
       },
-      runtime: createRuntime(),
+      runtime: { error: vi.fn() },
       mediaMaxBytes: 1,
       processMessage,
     });
@@ -205,7 +203,7 @@ describe("handleLineWebhookEvents", () => {
         tokenSource: "config",
         config: { groupPolicy: "open", groups: { "*": { enabled: false } } },
       },
-      runtime: createRuntime(),
+      runtime: { error: vi.fn() },
       mediaMaxBytes: 1,
       processMessage,
     });

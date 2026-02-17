@@ -721,7 +721,7 @@ export class DiscordExecApprovalHandler {
   }
 
   /** Return the list of configured approver IDs. */
-  getApprovers(): string[] {
+  getApprovers(): Array<string | number> {
     return this.opts.config.approvers ?? [];
   }
 }

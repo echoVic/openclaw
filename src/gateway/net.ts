@@ -40,10 +40,6 @@ export function resolveHostName(hostHeader?: string): string {
       return host.slice(1, end);
     }
   }
-  // Unbracketed IPv6 host (e.g. "::1") has no port and should be returned as-is.
-  if (net.isIP(host) === 6) {
-    return host;
-  }
   const [name] = host.split(":");
   return name ?? "";
 }
@@ -214,16 +210,12 @@ export function isTrustedProxyAddress(ip: string | undefined, trustedProxies?: s
   }
 
   return trustedProxies.some((proxy) => {
-    const candidate = proxy.trim();
-    if (!candidate) {
-      return false;
-    }
     // Handle CIDR notation
-    if (candidate.includes("/")) {
-      return ipMatchesCIDR(normalized, candidate);
+    if (proxy.includes("/")) {
+      return ipMatchesCIDR(normalized, proxy);
     }
     // Exact IP match
-    return normalizeIp(candidate) === normalized;
+    return normalizeIp(proxy) === normalized;
   });
 }
 

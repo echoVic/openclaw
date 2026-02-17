@@ -30,22 +30,6 @@ describe("extractTextFromChatContent", () => {
       }),
     ).toBe("Here ok");
   });
-
-  it("supports custom join and normalization", () => {
-    expect(
-      extractTextFromChatContent(
-        [
-          { type: "text", text: " hello " },
-          { type: "text", text: "world " },
-        ],
-        {
-          sanitizeText: (text) => text.trim(),
-          joinWith: "\n",
-          normalizeText: (text) => text.trim(),
-        },
-      ),
-    ).toBe("hello\nworld");
-  });
 });
 
 describe("shared/frontmatter", () => {

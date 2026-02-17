@@ -24,47 +24,6 @@ describe("security fix", () => {
     return dir;
   };
 
-  const createFixEnv = (stateDir: string, configPath: string) => ({
-    ...process.env,
-    OPENCLAW_STATE_DIR: stateDir,
-    OPENCLAW_CONFIG_PATH: configPath,
-  });
-
-  const writeJsonConfig = async (configPath: string, config: Record<string, unknown>) => {
-    await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
-  };
-
-  const writeWhatsAppConfig = async (configPath: string, whatsapp: Record<string, unknown>) => {
-    await writeJsonConfig(configPath, {
-      channels: {
-        whatsapp,
-      },
-    });
-  };
-
-  const readParsedConfig = async (configPath: string) =>
-    JSON.parse(await fs.readFile(configPath, "utf-8")) as Record<string, unknown>;
-
-  const runFixAndReadChannels = async (stateDir: string, configPath: string) => {
-    const env = createFixEnv(stateDir, configPath);
-    const res = await fixSecurityFootguns({ env, stateDir, configPath });
-    const parsed = await readParsedConfig(configPath);
-    return {
-      res,
-      channels: parsed.channels as Record<string, Record<string, unknown>>,
-    };
-  };
-
-  const writeWhatsAppAllowFromStore = async (stateDir: string, allowFrom: string[]) => {
-    const credsDir = path.join(stateDir, "credentials");
-    await fs.mkdir(credsDir, { recursive: true });
-    await fs.writeFile(
-      path.join(credsDir, "whatsapp-allowFrom.json"),
-      `${JSON.stringify({ version: 1, allowFrom }, null, 2)}\n`,
-      "utf-8",
-    );
-  };
-
   beforeAll(async () => {
     fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-security-fix-suite-"));
   });
@@ -80,20 +39,39 @@ describe("security fix", () => {
     await fs.chmod(stateDir, 0o755);
 
     const configPath = path.join(stateDir, "openclaw.json");
-    await writeJsonConfig(configPath, {
-      channels: {
-        telegram: { groupPolicy: "open" },
-        whatsapp: { groupPolicy: "open" },
-        discord: { groupPolicy: "open" },
-        signal: { groupPolicy: "open" },
-        imessage: { groupPolicy: "open" },
-      },
-      logging: { redactSensitive: "off" },
-    });
+    await fs.writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          channels: {
+            telegram: { groupPolicy: "open" },
+            whatsapp: { groupPolicy: "open" },
+            discord: { groupPolicy: "open" },
+            signal: { groupPolicy: "open" },
+            imessage: { groupPolicy: "open" },
+          },
+          logging: { redactSensitive: "off" },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf-8",
+    );
     await fs.chmod(configPath, 0o644);
 
-    await writeWhatsAppAllowFromStore(stateDir, [" +15551234567 "]);
-    const env = createFixEnv(stateDir, configPath);
+    const credsDir = path.join(stateDir, "credentials");
+    await fs.mkdir(credsDir, { recursive: true });
+    await fs.writeFile(
+      path.join(credsDir, "whatsapp-allowFrom.json"),
+      `${JSON.stringify({ version: 1, allowFrom: [" +15551234567 "] }, null, 2)}\n`,
+      "utf-8",
+    );
+
+    const env = {
+      ...process.env,
+      OPENCLAW_STATE_DIR: stateDir,
+      OPENCLAW_CONFIG_PATH: configPath,
+    };
 
     const res = await fixSecurityFootguns({ env, stateDir, configPath });
     expect(res.ok).toBe(true);
@@ -115,7 +93,7 @@ describe("security fix", () => {
     const configMode = (await fs.stat(configPath)).mode & 0o777;
     expectPerms(configMode, 0o600);
 
-    const parsed = await readParsedConfig(configPath);
+    const parsed = JSON.parse(await fs.readFile(configPath, "utf-8")) as Record<string, unknown>;
     const channels = parsed.channels as Record<string, Record<string, unknown>>;
     expect(channels.telegram.groupPolicy).toBe("allowlist");
     expect(channels.whatsapp.groupPolicy).toBe("allowlist");
@@ -130,16 +108,43 @@ describe("security fix", () => {
     const stateDir = await createStateDir("per-account");
 
     const configPath = path.join(stateDir, "openclaw.json");
-    await writeWhatsAppConfig(configPath, {
-      accounts: {
-        a1: { groupPolicy: "open" },
-      },
-    });
+    await fs.writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          channels: {
+            whatsapp: {
+              accounts: {
+                a1: { groupPolicy: "open" },
+              },
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf-8",
+    );
 
-    await writeWhatsAppAllowFromStore(stateDir, ["+15550001111"]);
-    const { res, channels } = await runFixAndReadChannels(stateDir, configPath);
+    const credsDir = path.join(stateDir, "credentials");
+    await fs.mkdir(credsDir, { recursive: true });
+    await fs.writeFile(
+      path.join(credsDir, "whatsapp-allowFrom.json"),
+      `${JSON.stringify({ version: 1, allowFrom: ["+15550001111"] }, null, 2)}\n`,
+      "utf-8",
+    );
+
+    const env = {
+      ...process.env,
+      OPENCLAW_STATE_DIR: stateDir,
+      OPENCLAW_CONFIG_PATH: configPath,
+    };
+
+    const res = await fixSecurityFootguns({ env, stateDir, configPath });
     expect(res.ok).toBe(true);
 
+    const parsed = JSON.parse(await fs.readFile(configPath, "utf-8")) as Record<string, unknown>;
+    const channels = parsed.channels as Record<string, Record<string, unknown>>;
     const whatsapp = channels.whatsapp;
     const accounts = whatsapp.accounts as Record<string, Record<string, unknown>>;
 
@@ -151,15 +156,39 @@ describe("security fix", () => {
     const stateDir = await createStateDir("no-seed");
 
     const configPath = path.join(stateDir, "openclaw.json");
-    await writeWhatsAppConfig(configPath, {
-      groupPolicy: "open",
-      allowFrom: ["+15552223333"],
-    });
+    await fs.writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          channels: {
+            whatsapp: { groupPolicy: "open", allowFrom: ["+15552223333"] },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf-8",
+    );
 
-    await writeWhatsAppAllowFromStore(stateDir, ["+15550001111"]);
-    const { res, channels } = await runFixAndReadChannels(stateDir, configPath);
+    const credsDir = path.join(stateDir, "credentials");
+    await fs.mkdir(credsDir, { recursive: true });
+    await fs.writeFile(
+      path.join(credsDir, "whatsapp-allowFrom.json"),
+      `${JSON.stringify({ version: 1, allowFrom: ["+15550001111"] }, null, 2)}\n`,
+      "utf-8",
+    );
+
+    const env = {
+      ...process.env,
+      OPENCLAW_STATE_DIR: stateDir,
+      OPENCLAW_CONFIG_PATH: configPath,
+    };
+
+    const res = await fixSecurityFootguns({ env, stateDir, configPath });
     expect(res.ok).toBe(true);
 
+    const parsed = JSON.parse(await fs.readFile(configPath, "utf-8")) as Record<string, unknown>;
+    const channels = parsed.channels as Record<string, Record<string, unknown>>;
     expect(channels.whatsapp.groupPolicy).toBe("allowlist");
     expect(channels.whatsapp.groupAllowFrom).toBeUndefined();
   });
@@ -172,7 +201,11 @@ describe("security fix", () => {
     await fs.writeFile(configPath, "{ this is not json }\n", "utf-8");
     await fs.chmod(configPath, 0o644);
 
-    const env = createFixEnv(stateDir, configPath);
+    const env = {
+      ...process.env,
+      OPENCLAW_STATE_DIR: stateDir,
+      OPENCLAW_CONFIG_PATH: configPath,
+    };
 
     const res = await fixSecurityFootguns({ env, stateDir, configPath });
     expect(res.ok).toBe(false);
@@ -222,9 +255,6 @@ describe("security fix", () => {
     const sessionsStorePath = path.join(sessionsDir, "sessions.json");
     await fs.writeFile(sessionsStorePath, "{}\n", "utf-8");
     await fs.chmod(sessionsStorePath, 0o644);
-    const transcriptPath = path.join(sessionsDir, "sess-main.jsonl");
-    await fs.writeFile(transcriptPath, '{"type":"session"}\n', "utf-8");
-    await fs.chmod(transcriptPath, 0o644);
 
     const env = {
       ...process.env,
@@ -239,7 +269,6 @@ describe("security fix", () => {
     expectPerms((await fs.stat(allowFromPath)).mode & 0o777, 0o600);
     expectPerms((await fs.stat(authProfilesPath)).mode & 0o777, 0o600);
     expectPerms((await fs.stat(sessionsStorePath)).mode & 0o777, 0o600);
-    expectPerms((await fs.stat(transcriptPath)).mode & 0o777, 0o600);
     expectPerms((await fs.stat(includePath)).mode & 0o777, 0o600);
   });
 });

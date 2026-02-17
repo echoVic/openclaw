@@ -2,11 +2,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import {
   createReplyPrefixOptions,
+  normalizeWebhookPath,
   readJsonBodyWithLimit,
-  registerWebhookTarget,
-  rejectNonPostWebhookRequest,
   resolveWebhookPath,
-  resolveWebhookTargets,
   requestBodyErrorToText,
   resolveMentionGatingWithBypass,
 } from "openclaw/plugin-sdk";
@@ -91,7 +89,19 @@ function warnDeprecatedUsersEmailEntries(
 }
 
 export function registerGoogleChatWebhookTarget(target: WebhookTarget): () => void {
-  return registerWebhookTarget(webhookTargets, target).unregister;
+  const key = normalizeWebhookPath(target.path);
+  const normalizedTarget = { ...target, path: key };
+  const existing = webhookTargets.get(key) ?? [];
+  const next = [...existing, normalizedTarget];
+  webhookTargets.set(key, next);
+  return () => {
+    const updated = (webhookTargets.get(key) ?? []).filter((entry) => entry !== normalizedTarget);
+    if (updated.length > 0) {
+      webhookTargets.set(key, updated);
+    } else {
+      webhookTargets.delete(key);
+    }
+  };
 }
 
 function normalizeAudienceType(value?: string | null): GoogleChatAudienceType | undefined {
@@ -113,13 +123,17 @@ export async function handleGoogleChatWebhookRequest(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<boolean> {
-  const resolved = resolveWebhookTargets(req, webhookTargets);
-  if (!resolved) {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const path = normalizeWebhookPath(url.pathname);
+  const targets = webhookTargets.get(path);
+  if (!targets || targets.length === 0) {
     return false;
   }
-  const { targets } = resolved;
 
-  if (rejectNonPostWebhookRequest(req, res)) {
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    res.setHeader("Allow", "POST");
+    res.end("Method Not Allowed");
     return true;
   }
 

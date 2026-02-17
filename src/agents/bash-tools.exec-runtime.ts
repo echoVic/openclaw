@@ -507,9 +507,8 @@ export async function runExecProcess(opts: {
     .wait()
     .then((exit): ExecProcessOutcome => {
       const durationMs = Date.now() - startedAt;
-      const isNormalExit = exit.reason === "exit";
-      const status: "completed" | "failed" = isNormalExit ? "completed" : "failed";
-
+      const status: "completed" | "failed" =
+        exit.exitCode === 0 && exit.reason === "exit" ? "completed" : "failed";
       markExited(session, exit.exitCode, exit.exitSignal, status);
       maybeNotifyOnExit(session, status);
       if (!session.child && session.stdin) {
@@ -517,14 +516,12 @@ export async function runExecProcess(opts: {
       }
       const aggregated = session.aggregated.trim();
       if (status === "completed") {
-        const exitCode = exit.exitCode ?? 0;
-        const exitMsg = exitCode !== 0 ? `\n\n(Command exited with code ${exitCode})` : "";
         return {
           status: "completed",
-          exitCode,
+          exitCode: exit.exitCode ?? 0,
           exitSignal: exit.exitSignal,
           durationMs,
-          aggregated: aggregated + exitMsg,
+          aggregated,
           timedOut: false,
         };
       }
@@ -535,7 +532,9 @@ export async function runExecProcess(opts: {
             ? "Command timed out waiting for output"
             : exit.exitSignal != null
               ? `Command aborted by signal ${exit.exitSignal}`
-              : "Command aborted before exit code was captured";
+              : exit.exitCode == null
+                ? "Command aborted before exit code was captured"
+                : `Command exited with code ${exit.exitCode}`;
       return {
         status: "failed",
         exitCode: exit.exitCode,

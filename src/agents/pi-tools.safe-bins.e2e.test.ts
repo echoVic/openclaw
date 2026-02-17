@@ -110,8 +110,7 @@ describe("createOpenClawCodingTools safeBins", () => {
     })();
     const text = result.content.find((content) => content.type === "text")?.text ?? "";
 
-    const resultDetails = result.details as { status?: string };
-    expect(resultDetails.status).toBe("completed");
+    expect(result.details.status).toBe("completed");
     expect(text).toContain(marker);
   });
 
@@ -153,8 +152,7 @@ describe("createOpenClawCodingTools safeBins", () => {
     });
     const text = result.content.find((content) => content.type === "text")?.text ?? "";
 
-    const blockedResultDetails = result.details as { status?: string };
-    expect(blockedResultDetails.status).toBe("completed");
+    expect(result.details.status).toBe("completed");
     expect(text).not.toContain(secret);
   });
 });

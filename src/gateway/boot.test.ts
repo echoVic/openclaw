@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionScope } from "../config/sessions/types.js";
 
 const agentCommand = vi.fn();
 
@@ -15,12 +14,7 @@ const { resolveStorePath } = await import("../config/sessions/paths.js");
 const { loadSessionStore, saveSessionStore } = await import("../config/sessions/store.js");
 
 describe("runBootOnce", () => {
-  const resolveMainStore = (
-    cfg: {
-      session?: { store?: string; scope?: SessionScope; mainKey?: string };
-      agents?: { list?: Array<{ id?: string; default?: boolean }> };
-    } = {},
-  ) => {
+  const resolveMainStore = (cfg: { session?: { store?: string } } = {}) => {
     const sessionKey = resolveMainSessionKey(cfg);
     const agentId = resolveAgentIdFromSessionKey(sessionKey);
     const storePath = resolveStorePath(cfg.session?.store, { agentId });
@@ -41,17 +35,6 @@ describe("runBootOnce", () => {
     sendMessageSignal: vi.fn(),
     sendMessageIMessage: vi.fn(),
   });
-
-  const mockAgentUpdatesMainSession = (storePath: string, sessionKey: string) => {
-    agentCommand.mockImplementation(async (opts: { sessionId?: string }) => {
-      const current = loadSessionStore(storePath, { skipCache: true });
-      current[sessionKey] = {
-        sessionId: String(opts.sessionId),
-        updatedAt: Date.now(),
-      };
-      await saveSessionStore(storePath, current);
-    });
-  };
 
   it("skips when BOOT.md is missing", async () => {
     const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-boot-"));
@@ -166,7 +149,14 @@ describe("runBootOnce", () => {
       },
     });
 
-    mockAgentUpdatesMainSession(storePath, sessionKey);
+    agentCommand.mockImplementation(async (opts: { sessionId?: string }) => {
+      const current = loadSessionStore(storePath, { skipCache: true });
+      current[sessionKey] = {
+        sessionId: String(opts.sessionId),
+        updatedAt: Date.now(),
+      };
+      await saveSessionStore(storePath, current);
+    });
     await expect(runBootOnce({ cfg, deps: makeDeps(), workspaceDir })).resolves.toEqual({
       status: "ran",
     });
@@ -184,7 +174,14 @@ describe("runBootOnce", () => {
     const cfg = {};
     const { sessionKey, storePath } = resolveMainStore(cfg);
 
-    mockAgentUpdatesMainSession(storePath, sessionKey);
+    agentCommand.mockImplementation(async (opts: { sessionId?: string }) => {
+      const current = loadSessionStore(storePath, { skipCache: true });
+      current[sessionKey] = {
+        sessionId: String(opts.sessionId),
+        updatedAt: Date.now(),
+      };
+      await saveSessionStore(storePath, current);
+    });
 
     await expect(runBootOnce({ cfg, deps: makeDeps(), workspaceDir })).resolves.toEqual({
       status: "ran",

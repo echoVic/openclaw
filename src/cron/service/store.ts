@@ -264,15 +264,6 @@ export async function ensureLoaded(
       mutated = true;
     }
 
-    if ("sessionKey" in raw) {
-      const sessionKey =
-        typeof raw.sessionKey === "string" ? normalizeOptionalText(raw.sessionKey) : undefined;
-      if (raw.sessionKey !== sessionKey) {
-        raw.sessionKey = sessionKey;
-        mutated = true;
-      }
-    }
-
     if (typeof raw.enabled !== "boolean") {
       raw.enabled = true;
       mutated = true;

@@ -1,6 +1,5 @@
 import { html } from "lit";
 import { repeat } from "lit/directives/repeat.js";
-import { t } from "../i18n/index.ts";
 import { refreshChat } from "./app-chat.ts";
 import { syncUrlWithSessionKey } from "./app-settings.ts";
 import type { AppViewState } from "./app-view-state.ts";
@@ -187,7 +186,7 @@ export function renderChatControls(state: AppViewState) {
             });
           }
         }}
-        title=${t("chat.refreshTitle")}
+        title="Refresh chat data"
       >
         ${refreshIcon}
       </button>
@@ -205,7 +204,11 @@ export function renderChatControls(state: AppViewState) {
           });
         }}
         aria-pressed=${showThinking}
-        title=${disableThinkingToggle ? t("chat.onboardingDisabled") : t("chat.thinkingToggle")}
+        title=${
+          disableThinkingToggle
+            ? "Disabled during onboarding"
+            : "Toggle assistant thinking/working output"
+        }
       >
         ${icons.brain}
       </button>
@@ -222,7 +225,11 @@ export function renderChatControls(state: AppViewState) {
           });
         }}
         aria-pressed=${focusActive}
-        title=${disableFocusToggle ? t("chat.onboardingDisabled") : t("chat.focusToggle")}
+        title=${
+          disableFocusToggle
+            ? "Disabled during onboarding"
+            : "Toggle focus mode (hide sidebar + page header)"
+        }
       >
         ${focusIcon}
       </button>

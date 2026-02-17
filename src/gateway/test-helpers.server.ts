@@ -296,20 +296,9 @@ export async function occupyPort(): Promise<{
   });
 }
 
-type GatewayTestMessage = {
-  type?: string;
-  id?: string;
-  ok?: boolean;
-  event?: string;
-  payload?: Record<string, unknown> | null;
-  seq?: number;
-  stateVersion?: Record<string, unknown>;
-  [key: string]: unknown;
-};
-
-export function onceMessage<T extends GatewayTestMessage = GatewayTestMessage>(
+export function onceMessage<T = unknown>(
   ws: WebSocket,
-  filter: (obj: T) => boolean,
+  filter: (obj: unknown) => boolean,
   // Full-suite runs can saturate the event loop (581+ files). Keep this high
   // enough to avoid flaky RPC timeouts, but still fail fast when a response
   // never arrives.
@@ -323,12 +312,12 @@ export function onceMessage<T extends GatewayTestMessage = GatewayTestMessage>(
       reject(new Error(`closed ${code}: ${reason.toString()}`));
     };
     const handler = (data: WebSocket.RawData) => {
-      const obj = JSON.parse(rawDataToString(data)) as T;
+      const obj = JSON.parse(rawDataToString(data));
       if (filter(obj)) {
         clearTimeout(timer);
         ws.off("message", handler);
         ws.off("close", closeHandler);
-        resolve(obj);
+        resolve(obj as T);
       }
     };
     ws.on("message", handler);
@@ -441,7 +430,7 @@ type ConnectResponse = {
   type: "res";
   id: string;
   ok: boolean;
-  payload?: Record<string, unknown>;
+  payload?: unknown;
   error?: { message?: string };
 };
 
@@ -573,7 +562,7 @@ export async function connectOk(ws: WebSocket, opts?: Parameters<typeof connectR
   return res.payload as { type: "hello-ok" };
 }
 
-export async function rpcReq<T extends Record<string, unknown>>(
+export async function rpcReq<T = unknown>(
   ws: WebSocket,
   method: string,
   params?: unknown,
@@ -586,7 +575,7 @@ export async function rpcReq<T extends Record<string, unknown>>(
     type: "res";
     id: string;
     ok: boolean;
-    payload?: T | null | undefined;
+    payload?: T;
     error?: { message?: string; code?: string };
   }>(
     ws,

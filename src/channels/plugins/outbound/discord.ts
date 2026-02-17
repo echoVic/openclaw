@@ -1,5 +1,4 @@
 import { sendMessageDiscord, sendPollDiscord } from "../../../discord/send.js";
-import { normalizeDiscordOutboundTarget } from "../normalize/discord.js";
 import type { ChannelOutboundAdapter } from "../types.js";
 
 export const discordOutbound: ChannelOutboundAdapter = {
@@ -7,7 +6,6 @@ export const discordOutbound: ChannelOutboundAdapter = {
   chunker: null,
   textChunkLimit: 2000,
   pollMaxOptions: 10,
-  resolveTarget: ({ to }) => normalizeDiscordOutboundTarget(to),
   sendText: async ({ to, text, accountId, deps, replyToId, silent }) => {
     const send = deps?.sendDiscord ?? sendMessageDiscord;
     const result = await send(to, text, {

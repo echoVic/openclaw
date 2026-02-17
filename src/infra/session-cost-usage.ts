@@ -799,44 +799,12 @@ export async function loadSessionUsageTimeSeries(params: {
   if (sortedPoints.length > maxPoints) {
     const step = Math.ceil(sortedPoints.length / maxPoints);
     const downsampled: SessionUsageTimePoint[] = [];
-    let downsampledCumulativeTokens = 0;
-    let downsampledCumulativeCost = 0;
     for (let i = 0; i < sortedPoints.length; i += step) {
-      const bucket = sortedPoints.slice(i, i + step);
-      const bucketLast = bucket[bucket.length - 1];
-      if (!bucketLast) {
-        continue;
-      }
-
-      let bucketInput = 0;
-      let bucketOutput = 0;
-      let bucketCacheRead = 0;
-      let bucketCacheWrite = 0;
-      let bucketTotalTokens = 0;
-      let bucketCost = 0;
-      for (const point of bucket) {
-        bucketInput += point.input;
-        bucketOutput += point.output;
-        bucketCacheRead += point.cacheRead;
-        bucketCacheWrite += point.cacheWrite;
-        bucketTotalTokens += point.totalTokens;
-        bucketCost += point.cost;
-      }
-
-      downsampledCumulativeTokens += bucketTotalTokens;
-      downsampledCumulativeCost += bucketCost;
-
-      downsampled.push({
-        timestamp: bucketLast.timestamp,
-        input: bucketInput,
-        output: bucketOutput,
-        cacheRead: bucketCacheRead,
-        cacheWrite: bucketCacheWrite,
-        totalTokens: bucketTotalTokens,
-        cost: bucketCost,
-        cumulativeTokens: downsampledCumulativeTokens,
-        cumulativeCost: downsampledCumulativeCost,
-      });
+      downsampled.push(sortedPoints[i]);
+    }
+    // Always include the last point
+    if (downsampled[downsampled.length - 1] !== sortedPoints[sortedPoints.length - 1]) {
+      downsampled.push(sortedPoints[sortedPoints.length - 1]);
     }
     return { sessionId: params.sessionId, points: downsampled };
   }

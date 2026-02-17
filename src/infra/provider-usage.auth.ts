@@ -2,7 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  dedupeProfileIds,
   ensureAuthProfileStore,
   listProfilesForProvider,
   resolveApiKeyForProfile,
@@ -145,7 +144,14 @@ async function resolveOAuthToken(params: {
     store,
     provider: params.provider,
   });
-  const deduped = dedupeProfileIds(order);
+
+  const candidates = order;
+  const deduped: string[] = [];
+  for (const entry of candidates) {
+    if (!deduped.includes(entry)) {
+      deduped.push(entry);
+    }
+  }
 
   for (const profileId of deduped) {
     const cred = store.profiles[profileId];

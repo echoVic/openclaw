@@ -41,10 +41,8 @@ function createToolHandlerCtx(params: {
       lastToolError: undefined,
       pendingMessagingTexts: new Map<string, string>(),
       pendingMessagingTargets: new Map<string, unknown>(),
-      pendingMessagingMediaUrls: new Map<string, string[]>(),
       messagingToolSentTexts: [] as string[],
       messagingToolSentTextsNormalized: [] as string[],
-      messagingToolSentMediaUrls: [] as string[],
       messagingToolSentTargets: [] as unknown[],
       blockBuffer: "",
     },
@@ -104,17 +102,7 @@ describe("after_tool_call hook wiring", () => {
     expect(hookMocks.runner.runAfterToolCall).toHaveBeenCalledTimes(1);
     expect(hookMocks.runner.runBeforeToolCall).not.toHaveBeenCalled();
 
-    const firstCall = (hookMocks.runner.runAfterToolCall as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(firstCall).toBeDefined();
-    const event = firstCall?.[0] as
-      | { toolName?: string; params?: unknown; error?: unknown; durationMs?: unknown }
-      | undefined;
-    const context = firstCall?.[1] as { toolName?: string } | undefined;
-    expect(event).toBeDefined();
-    expect(context).toBeDefined();
-    if (!event || !context) {
-      throw new Error("missing hook call payload");
-    }
+    const [event, context] = hookMocks.runner.runAfterToolCall.mock.calls[0];
     expect(event.toolName).toBe("read");
     expect(event.params).toEqual({ path: "/tmp/file.txt" });
     expect(event.error).toBeUndefined();
@@ -153,13 +141,7 @@ describe("after_tool_call hook wiring", () => {
 
     expect(hookMocks.runner.runAfterToolCall).toHaveBeenCalledTimes(1);
 
-    const firstCall = (hookMocks.runner.runAfterToolCall as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(firstCall).toBeDefined();
-    const event = firstCall?.[0] as { error?: unknown } | undefined;
-    expect(event).toBeDefined();
-    if (!event) {
-      throw new Error("missing hook call payload");
-    }
+    const [event] = hookMocks.runner.runAfterToolCall.mock.calls[0];
     expect(event.error).toBeDefined();
   });
 

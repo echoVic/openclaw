@@ -98,10 +98,13 @@ function buildTargetKey(target: ExecApprovalForwardTarget): string {
   return [channel, target.to, accountId, threadId].join(":");
 }
 
-// Discord has component-based exec approvals; skip the text fallback there.
-function shouldSkipDiscordForwarding(target: ExecApprovalForwardTarget): boolean {
-  const channel = normalizeMessageChannel(target.channel) ?? target.channel;
-  return channel === "discord";
+function shouldSkipDiscordForwarding(cfg: OpenClawConfig): boolean {
+  const discordConfig = cfg.channels?.discord?.execApprovals;
+  if (!discordConfig?.enabled) {
+    return false;
+  }
+  const target = discordConfig.target ?? "dm";
+  return target === "channel" || target === "both";
 }
 
 function formatApprovalCommand(command: string): { inline: boolean; text: string } {
@@ -271,7 +274,9 @@ export function createExecApprovalForwarder(
       }
     }
 
-    const filteredTargets = targets.filter((target) => !shouldSkipDiscordForwarding(target));
+    const filteredTargets = shouldSkipDiscordForwarding(cfg)
+      ? targets.filter((target) => normalizeMessageChannel(target.channel) !== "discord")
+      : targets;
 
     if (filteredTargets.length === 0) {
       return;

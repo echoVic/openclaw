@@ -10,7 +10,7 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", thinkingLevel: "off" },
+      patch: { thinkingLevel: "off" },
     });
     expect(res.ok).toBe(true);
     if (!res.ok) {
@@ -27,7 +27,7 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", thinkingLevel: null },
+      patch: { thinkingLevel: null },
     });
     expect(res.ok).toBe(true);
     if (!res.ok) {
@@ -42,7 +42,7 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", elevatedLevel: "off" },
+      patch: { elevatedLevel: "off" },
     });
     expect(res.ok).toBe(true);
     if (!res.ok) {
@@ -57,7 +57,7 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", elevatedLevel: "on" },
+      patch: { elevatedLevel: "on" },
     });
     expect(res.ok).toBe(true);
     if (!res.ok) {
@@ -74,7 +74,7 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", elevatedLevel: null },
+      patch: { elevatedLevel: null },
     });
     expect(res.ok).toBe(true);
     if (!res.ok) {
@@ -89,7 +89,7 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", elevatedLevel: "maybe" },
+      patch: { elevatedLevel: "maybe" },
     });
     expect(res.ok).toBe(false);
     if (res.ok) {
@@ -114,8 +114,8 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", model: "openai/gpt-5.2" },
-      loadGatewayModelCatalog: async () => [{ provider: "openai", id: "gpt-5.2", name: "gpt-5.2" }],
+      patch: { model: "openai/gpt-5.2" },
+      loadGatewayModelCatalog: async () => [{ provider: "openai", id: "gpt-5.2" }],
     });
     expect(res.ok).toBe(true);
     if (!res.ok) {
@@ -134,7 +134,7 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:subagent:child",
-      patch: { key: "agent:main:subagent:child", spawnDepth: 2 },
+      patch: { spawnDepth: 2 },
     });
     expect(res.ok).toBe(true);
     if (!res.ok) {
@@ -149,7 +149,7 @@ describe("gateway sessions patch", () => {
       cfg: {} as OpenClawConfig,
       store,
       storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", spawnDepth: 1 },
+      patch: { spawnDepth: 1 },
     });
     expect(res.ok).toBe(false);
     if (res.ok) {

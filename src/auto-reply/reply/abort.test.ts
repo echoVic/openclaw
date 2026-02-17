@@ -2,12 +2,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SubagentRunRecord } from "../../agents/subagent-registry.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
   getAbortMemory,
   getAbortMemorySizeForTest,
-  isAbortRequestText,
   isAbortTrigger,
   resetAbortMemoryForTest,
   setAbortMemory,
@@ -29,9 +27,7 @@ const commandQueueMocks = vi.hoisted(() => ({
 vi.mock("../../process/command-queue.js", () => commandQueueMocks);
 
 const subagentRegistryMocks = vi.hoisted(() => ({
-  listSubagentRunsForRequester: vi.fn<(requesterSessionKey: string) => SubagentRunRecord[]>(
-    () => [],
-  ),
+  listSubagentRunsForRequester: vi.fn(() => []),
   markSubagentRunTerminated: vi.fn(() => 1),
 }));
 
@@ -41,27 +37,6 @@ vi.mock("../../agents/subagent-registry.js", () => ({
 }));
 
 describe("abort detection", () => {
-  async function runStopCommand(params: {
-    cfg: OpenClawConfig;
-    sessionKey: string;
-    from: string;
-    to: string;
-  }) {
-    return tryFastAbortFromMessage({
-      ctx: buildTestCtx({
-        CommandBody: "/stop",
-        RawBody: "/stop",
-        CommandAuthorized: true,
-        SessionKey: params.sessionKey,
-        Provider: "telegram",
-        Surface: "telegram",
-        From: params.from,
-        To: params.to,
-      }),
-      cfg: params.cfg,
-    });
-  }
-
   afterEach(() => {
     resetAbortMemoryForTest();
   });
@@ -100,16 +75,6 @@ describe("abort detection", () => {
     expect(isAbortTrigger("/stop")).toBe(false);
   });
 
-  it("isAbortRequestText aligns abort command semantics", () => {
-    expect(isAbortRequestText("/stop")).toBe(true);
-    expect(isAbortRequestText("stop")).toBe(true);
-    expect(isAbortRequestText("/stop@openclaw_bot", { botUsername: "openclaw_bot" })).toBe(true);
-
-    expect(isAbortRequestText("/status")).toBe(false);
-    expect(isAbortRequestText("stop please")).toBe(false);
-    expect(isAbortRequestText("/abort")).toBe(false);
-  });
-
   it("removes abort memory entry when flag is reset", () => {
     setAbortMemory("session-1", true);
     expect(getAbortMemory("session-1")).toBe(true);
@@ -133,11 +98,18 @@ describe("abort detection", () => {
     const storePath = path.join(root, "sessions.json");
     const cfg = { session: { store: storePath }, commands: { text: false } } as OpenClawConfig;
 
-    const result = await runStopCommand({
+    const result = await tryFastAbortFromMessage({
+      ctx: buildTestCtx({
+        CommandBody: "/stop",
+        RawBody: "/stop",
+        CommandAuthorized: true,
+        SessionKey: "telegram:123",
+        Provider: "telegram",
+        Surface: "telegram",
+        From: "telegram:123",
+        To: "telegram:123",
+      }),
       cfg,
-      sessionKey: "telegram:123",
-      from: "telegram:123",
-      to: "telegram:123",
     });
 
     expect(result.handled).toBe(true);
@@ -189,11 +161,18 @@ describe("abort detection", () => {
     );
     expect(getFollowupQueueDepth(sessionKey)).toBe(1);
 
-    const result = await runStopCommand({
+    const result = await tryFastAbortFromMessage({
+      ctx: buildTestCtx({
+        CommandBody: "/stop",
+        RawBody: "/stop",
+        CommandAuthorized: true,
+        SessionKey: sessionKey,
+        Provider: "telegram",
+        Surface: "telegram",
+        From: "telegram:123",
+        To: "telegram:123",
+      }),
       cfg,
-      sessionKey,
-      from: "telegram:123",
-      to: "telegram:123",
     });
 
     expect(result.handled).toBe(true);
@@ -239,11 +218,18 @@ describe("abort detection", () => {
       },
     ]);
 
-    const result = await runStopCommand({
+    const result = await tryFastAbortFromMessage({
+      ctx: buildTestCtx({
+        CommandBody: "/stop",
+        RawBody: "/stop",
+        CommandAuthorized: true,
+        SessionKey: sessionKey,
+        Provider: "telegram",
+        Surface: "telegram",
+        From: "telegram:parent",
+        To: "telegram:parent",
+      }),
       cfg,
-      sessionKey,
-      from: "telegram:parent",
-      to: "telegram:parent",
     });
 
     expect(result.stoppedSubagents).toBe(1);
@@ -310,11 +296,18 @@ describe("abort detection", () => {
       ])
       .mockReturnValueOnce([]);
 
-    const result = await runStopCommand({
+    const result = await tryFastAbortFromMessage({
+      ctx: buildTestCtx({
+        CommandBody: "/stop",
+        RawBody: "/stop",
+        CommandAuthorized: true,
+        SessionKey: sessionKey,
+        Provider: "telegram",
+        Surface: "telegram",
+        From: "telegram:parent",
+        To: "telegram:parent",
+      }),
       cfg,
-      sessionKey,
-      from: "telegram:parent",
-      to: "telegram:parent",
     });
 
     // Should stop both depth-1 and depth-2 agents (cascade)
@@ -385,11 +378,18 @@ describe("abort detection", () => {
       ])
       .mockReturnValueOnce([]);
 
-    const result = await runStopCommand({
+    const result = await tryFastAbortFromMessage({
+      ctx: buildTestCtx({
+        CommandBody: "/stop",
+        RawBody: "/stop",
+        CommandAuthorized: true,
+        SessionKey: sessionKey,
+        Provider: "telegram",
+        Surface: "telegram",
+        From: "telegram:parent",
+        To: "telegram:parent",
+      }),
       cfg,
-      sessionKey,
-      from: "telegram:parent",
-      to: "telegram:parent",
     });
 
     // Should skip killing the ended depth-1 run itself, but still kill depth-2.

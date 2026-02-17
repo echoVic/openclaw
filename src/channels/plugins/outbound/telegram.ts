@@ -1,4 +1,3 @@
-import type { TelegramInlineButtons } from "../../../telegram/button-types.js";
 import { markdownToTelegramHtmlChunks } from "../../../telegram/format.js";
 import {
   parseTelegramReplyToMessageId,
@@ -54,7 +53,7 @@ export const telegramOutbound: ChannelOutboundAdapter = {
     const replyToMessageId = parseTelegramReplyToMessageId(replyToId);
     const messageThreadId = parseTelegramThreadId(threadId);
     const telegramData = payload.channelData?.telegram as
-      | { buttons?: TelegramInlineButtons; quoteText?: string }
+      | { buttons?: Array<Array<{ text: string; callback_data: string }>>; quoteText?: string }
       | undefined;
     const quoteText =
       typeof telegramData?.quoteText === "string" ? telegramData.quoteText : undefined;

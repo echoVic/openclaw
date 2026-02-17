@@ -18,13 +18,9 @@ const deliveryMocks = vi.hoisted(() => ({
   deliverReplies: vi.fn(async () => ({ delivered: true })),
 }));
 
-vi.mock("../auto-reply/skill-commands.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../auto-reply/skill-commands.js")>();
-  return {
-    ...actual,
-    listSkillCommandsForAgents,
-  };
-});
+vi.mock("../auto-reply/skill-commands.js", () => ({
+  listSkillCommandsForAgents,
+}));
 vi.mock("../plugins/commands.js", () => ({
   getPluginCommandSpecs: pluginCommandMocks.getPluginCommandSpecs,
   matchPluginCommand: pluginCommandMocks.matchPluginCommand,
@@ -56,7 +52,7 @@ describe("registerTelegramNativeCommands", () => {
       command: vi.fn(),
     } as unknown as Parameters<typeof registerTelegramNativeCommands>[0]["bot"],
     cfg,
-    runtime: {} as unknown as RuntimeEnv,
+    runtime: {} as RuntimeEnv,
     accountId,
     telegramCfg: {} as TelegramAccountConfig,
     allowFrom: [],
@@ -132,7 +128,7 @@ describe("registerTelegramNativeCommands", () => {
         },
         command: vi.fn(),
       } as unknown as Parameters<typeof registerTelegramNativeCommands>[0]["bot"],
-      runtime: { log: runtimeLog } as unknown as RuntimeEnv,
+      runtime: { log: runtimeLog } as RuntimeEnv,
       telegramCfg: { customCommands } as TelegramAccountConfig,
       nativeEnabled: false,
       nativeSkillsEnabled: false,
@@ -164,15 +160,15 @@ describe("registerTelegramNativeCommands", () => {
         name: "plug",
         description: "Plugin command",
       },
-    ] as never);
+    ]);
     pluginCommandMocks.matchPluginCommand.mockReturnValue({
       command: { key: "plug", requireAuth: false },
       args: undefined,
-    } as never);
+    });
     pluginCommandMocks.executePluginCommand.mockResolvedValue({
       text: "with media",
       mediaUrl: "/tmp/workspace-work/render.png",
-    } as never);
+    });
 
     registerTelegramNativeCommands({
       ...buildParams(cfg),

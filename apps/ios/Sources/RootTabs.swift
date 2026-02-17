@@ -3,7 +3,6 @@ import SwiftUI
 struct RootTabs: View {
     @Environment(NodeAppModel.self) private var appModel
     @Environment(VoiceWakeManager.self) private var voiceWake
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(VoiceWakePreferences.enabledKey) private var voiceWakeEnabled: Bool = false
     @State private var selectedTab: Int = 0
     @State private var voiceWakeToastText: String?
@@ -53,14 +52,14 @@ struct RootTabs: View {
             guard !trimmed.isEmpty else { return }
 
             self.toastDismissTask?.cancel()
-            withAnimation(self.reduceMotion ? .none : .spring(response: 0.25, dampingFraction: 0.85)) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                 self.voiceWakeToastText = trimmed
             }
 
             self.toastDismissTask = Task {
                 try? await Task.sleep(nanoseconds: 2_300_000_000)
                 await MainActor.run {
-                    withAnimation(self.reduceMotion ? .none : .easeOut(duration: 0.25)) {
+                    withAnimation(.easeOut(duration: 0.25)) {
                         self.voiceWakeToastText = nil
                     }
                 }

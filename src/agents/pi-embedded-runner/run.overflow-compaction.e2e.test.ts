@@ -52,7 +52,6 @@ import { log } from "./logger.js";
 import { runEmbeddedPiAgent } from "./run.js";
 import { makeAttemptResult } from "./run.overflow-compaction.fixture.js";
 import { runEmbeddedAttempt } from "./run/attempt.js";
-import type { EmbeddedRunAttemptResult } from "./run/types.js";
 import {
   sessionLikelyHasOversizedToolResults,
   truncateOversizedToolResultsInSession,
@@ -172,12 +171,7 @@ describe("overflow compaction in run loop", () => {
       .mockResolvedValueOnce(
         makeAttemptResult({
           promptError: overflowError,
-          messagesSnapshot: [
-            {
-              role: "assistant",
-              content: "big tool output",
-            } as unknown as EmbeddedRunAttemptResult["messagesSnapshot"][number],
-          ],
+          messagesSnapshot: [{ role: "assistant", content: "big tool output" }],
         }),
       )
       .mockResolvedValueOnce(makeAttemptResult({ promptError: null }));
@@ -368,7 +362,7 @@ describe("overflow compaction in run loop", () => {
             cacheWrite: 0,
             total: 2_000,
           },
-        } as unknown as EmbeddedRunAttemptResult["lastAssistant"],
+        } as EmbeddedRunAttemptResult["lastAssistant"],
       }),
     );
 

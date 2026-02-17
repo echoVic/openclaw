@@ -14,59 +14,6 @@ const oauthFixture = {
   accountId: "acct_123",
 };
 
-const BEDROCK_PROVIDER_CFG = {
-  models: {
-    providers: {
-      "amazon-bedrock": {
-        baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
-        api: "bedrock-converse-stream",
-        auth: "aws-sdk",
-        models: [],
-      },
-    },
-  },
-} as const;
-
-function captureBedrockEnv() {
-  return {
-    bearer: process.env.AWS_BEARER_TOKEN_BEDROCK,
-    access: process.env.AWS_ACCESS_KEY_ID,
-    secret: process.env.AWS_SECRET_ACCESS_KEY,
-    profile: process.env.AWS_PROFILE,
-  };
-}
-
-function restoreBedrockEnv(previous: ReturnType<typeof captureBedrockEnv>) {
-  if (previous.bearer === undefined) {
-    delete process.env.AWS_BEARER_TOKEN_BEDROCK;
-  } else {
-    process.env.AWS_BEARER_TOKEN_BEDROCK = previous.bearer;
-  }
-  if (previous.access === undefined) {
-    delete process.env.AWS_ACCESS_KEY_ID;
-  } else {
-    process.env.AWS_ACCESS_KEY_ID = previous.access;
-  }
-  if (previous.secret === undefined) {
-    delete process.env.AWS_SECRET_ACCESS_KEY;
-  } else {
-    process.env.AWS_SECRET_ACCESS_KEY = previous.secret;
-  }
-  if (previous.profile === undefined) {
-    delete process.env.AWS_PROFILE;
-  } else {
-    process.env.AWS_PROFILE = previous.profile;
-  }
-}
-
-async function resolveBedrockProvider() {
-  return resolveApiKeyForProvider({
-    provider: "amazon-bedrock",
-    store: { version: 1, profiles: {} },
-    cfg: BEDROCK_PROVIDER_CFG as never,
-  });
-}
-
 describe("getApiKeyForModel", () => {
   it("migrates legacy oauth.json into auth-profiles.json", async () => {
     const envSnapshot = captureEnv([
@@ -311,7 +258,12 @@ describe("getApiKeyForModel", () => {
   });
 
   it("prefers Bedrock bearer token over access keys and profile", async () => {
-    const previous = captureBedrockEnv();
+    const previous = {
+      bearer: process.env.AWS_BEARER_TOKEN_BEDROCK,
+      access: process.env.AWS_ACCESS_KEY_ID,
+      secret: process.env.AWS_SECRET_ACCESS_KEY,
+      profile: process.env.AWS_PROFILE,
+    };
 
     try {
       process.env.AWS_BEARER_TOKEN_BEDROCK = "bedrock-token";
@@ -319,18 +271,57 @@ describe("getApiKeyForModel", () => {
       process.env.AWS_SECRET_ACCESS_KEY = "secret-key";
       process.env.AWS_PROFILE = "profile";
 
-      const resolved = await resolveBedrockProvider();
+      const resolved = await resolveApiKeyForProvider({
+        provider: "amazon-bedrock",
+        store: { version: 1, profiles: {} },
+        cfg: {
+          models: {
+            providers: {
+              "amazon-bedrock": {
+                baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+                api: "bedrock-converse-stream",
+                auth: "aws-sdk",
+                models: [],
+              },
+            },
+          },
+        } as never,
+      });
 
       expect(resolved.mode).toBe("aws-sdk");
       expect(resolved.apiKey).toBeUndefined();
       expect(resolved.source).toContain("AWS_BEARER_TOKEN_BEDROCK");
     } finally {
-      restoreBedrockEnv(previous);
+      if (previous.bearer === undefined) {
+        delete process.env.AWS_BEARER_TOKEN_BEDROCK;
+      } else {
+        process.env.AWS_BEARER_TOKEN_BEDROCK = previous.bearer;
+      }
+      if (previous.access === undefined) {
+        delete process.env.AWS_ACCESS_KEY_ID;
+      } else {
+        process.env.AWS_ACCESS_KEY_ID = previous.access;
+      }
+      if (previous.secret === undefined) {
+        delete process.env.AWS_SECRET_ACCESS_KEY;
+      } else {
+        process.env.AWS_SECRET_ACCESS_KEY = previous.secret;
+      }
+      if (previous.profile === undefined) {
+        delete process.env.AWS_PROFILE;
+      } else {
+        process.env.AWS_PROFILE = previous.profile;
+      }
     }
   });
 
   it("prefers Bedrock access keys over profile", async () => {
-    const previous = captureBedrockEnv();
+    const previous = {
+      bearer: process.env.AWS_BEARER_TOKEN_BEDROCK,
+      access: process.env.AWS_ACCESS_KEY_ID,
+      secret: process.env.AWS_SECRET_ACCESS_KEY,
+      profile: process.env.AWS_PROFILE,
+    };
 
     try {
       delete process.env.AWS_BEARER_TOKEN_BEDROCK;
@@ -338,18 +329,57 @@ describe("getApiKeyForModel", () => {
       process.env.AWS_SECRET_ACCESS_KEY = "secret-key";
       process.env.AWS_PROFILE = "profile";
 
-      const resolved = await resolveBedrockProvider();
+      const resolved = await resolveApiKeyForProvider({
+        provider: "amazon-bedrock",
+        store: { version: 1, profiles: {} },
+        cfg: {
+          models: {
+            providers: {
+              "amazon-bedrock": {
+                baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+                api: "bedrock-converse-stream",
+                auth: "aws-sdk",
+                models: [],
+              },
+            },
+          },
+        } as never,
+      });
 
       expect(resolved.mode).toBe("aws-sdk");
       expect(resolved.apiKey).toBeUndefined();
       expect(resolved.source).toContain("AWS_ACCESS_KEY_ID");
     } finally {
-      restoreBedrockEnv(previous);
+      if (previous.bearer === undefined) {
+        delete process.env.AWS_BEARER_TOKEN_BEDROCK;
+      } else {
+        process.env.AWS_BEARER_TOKEN_BEDROCK = previous.bearer;
+      }
+      if (previous.access === undefined) {
+        delete process.env.AWS_ACCESS_KEY_ID;
+      } else {
+        process.env.AWS_ACCESS_KEY_ID = previous.access;
+      }
+      if (previous.secret === undefined) {
+        delete process.env.AWS_SECRET_ACCESS_KEY;
+      } else {
+        process.env.AWS_SECRET_ACCESS_KEY = previous.secret;
+      }
+      if (previous.profile === undefined) {
+        delete process.env.AWS_PROFILE;
+      } else {
+        process.env.AWS_PROFILE = previous.profile;
+      }
     }
   });
 
   it("uses Bedrock profile when access keys are missing", async () => {
-    const previous = captureBedrockEnv();
+    const previous = {
+      bearer: process.env.AWS_BEARER_TOKEN_BEDROCK,
+      access: process.env.AWS_ACCESS_KEY_ID,
+      secret: process.env.AWS_SECRET_ACCESS_KEY,
+      profile: process.env.AWS_PROFILE,
+    };
 
     try {
       delete process.env.AWS_BEARER_TOKEN_BEDROCK;
@@ -357,13 +387,47 @@ describe("getApiKeyForModel", () => {
       delete process.env.AWS_SECRET_ACCESS_KEY;
       process.env.AWS_PROFILE = "profile";
 
-      const resolved = await resolveBedrockProvider();
+      const resolved = await resolveApiKeyForProvider({
+        provider: "amazon-bedrock",
+        store: { version: 1, profiles: {} },
+        cfg: {
+          models: {
+            providers: {
+              "amazon-bedrock": {
+                baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+                api: "bedrock-converse-stream",
+                auth: "aws-sdk",
+                models: [],
+              },
+            },
+          },
+        } as never,
+      });
 
       expect(resolved.mode).toBe("aws-sdk");
       expect(resolved.apiKey).toBeUndefined();
       expect(resolved.source).toContain("AWS_PROFILE");
     } finally {
-      restoreBedrockEnv(previous);
+      if (previous.bearer === undefined) {
+        delete process.env.AWS_BEARER_TOKEN_BEDROCK;
+      } else {
+        process.env.AWS_BEARER_TOKEN_BEDROCK = previous.bearer;
+      }
+      if (previous.access === undefined) {
+        delete process.env.AWS_ACCESS_KEY_ID;
+      } else {
+        process.env.AWS_ACCESS_KEY_ID = previous.access;
+      }
+      if (previous.secret === undefined) {
+        delete process.env.AWS_SECRET_ACCESS_KEY;
+      } else {
+        process.env.AWS_SECRET_ACCESS_KEY = previous.secret;
+      }
+      if (previous.profile === undefined) {
+        delete process.env.AWS_PROFILE;
+      } else {
+        process.env.AWS_PROFILE = previous.profile;
+      }
     }
   });
 

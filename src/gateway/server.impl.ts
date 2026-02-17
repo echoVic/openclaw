@@ -46,7 +46,6 @@ import { getTotalQueueSize } from "../process/command-queue.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import { createAuthRateLimiter, type AuthRateLimiter } from "./auth-rate-limit.js";
-import { startChannelHealthMonitor } from "./channel-health-monitor.js";
 import { startGatewayConfigReloader } from "./config-reload.js";
 import type { ControlUiRootState } from "./control-ui.js";
 import { ExecApprovalManager } from "./exec-approval-manager.js";
@@ -503,15 +502,6 @@ export async function startGatewayServer(
       }
     : startHeartbeatRunner({ cfg: cfgAtStart });
 
-  const healthCheckMinutes = cfgAtStart.gateway?.channelHealthCheckMinutes;
-  const healthCheckDisabled = healthCheckMinutes === 0;
-  const channelHealthMonitor = healthCheckDisabled
-    ? null
-    : startChannelHealthMonitor({
-        channelManager,
-        checkIntervalMs: (healthCheckMinutes ?? 5) * 60_000,
-      });
-
   if (!minimalTestGateway) {
     void cron.start().catch((err) => logCron.error(`failed to start: ${String(err)}`));
   }
@@ -730,7 +720,6 @@ export async function startGatewayServer(
       }
       skillsChangeUnsub();
       authRateLimiter?.dispose();
-      channelHealthMonitor?.stop();
       await close(opts);
     },
   };

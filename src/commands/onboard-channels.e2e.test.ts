@@ -1,28 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { discordPlugin } from "../../extensions/discord/src/channel.js";
+import { imessagePlugin } from "../../extensions/imessage/src/channel.js";
+import { signalPlugin } from "../../extensions/signal/src/channel.js";
+import { slackPlugin } from "../../extensions/slack/src/channel.js";
+import { telegramPlugin } from "../../extensions/telegram/src/channel.js";
+import { whatsappPlugin } from "../../extensions/whatsapp/src/channel.js";
 import type { OpenClawConfig } from "../config/config.js";
+import { setActivePluginRegistry } from "../plugins/runtime.js";
+import type { RuntimeEnv } from "../runtime.js";
+import { createTestRegistry } from "../test-utils/channel-plugins.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
-import { setDefaultChannelPluginRegistryForTests } from "./channel-test-helpers.js";
 import { setupChannels } from "./onboard-channels.js";
-import { createExitThrowingRuntime, createWizardPrompter } from "./test-wizard-helpers.js";
 
-function createPrompter(overrides: Partial<WizardPrompter>): WizardPrompter {
-  return createWizardPrompter(
-    {
-      progress: vi.fn(() => ({ update: vi.fn(), stop: vi.fn() })),
-      ...overrides,
-    },
-    { defaultSelect: "__done__" },
-  );
+const noopAsync = async () => {};
+
+function createRuntime(): RuntimeEnv {
+  return {
+    log: vi.fn(),
+    error: vi.fn(),
+    exit: vi.fn((code: number) => {
+      throw new Error(`exit:${code}`);
+    }),
+  };
 }
 
-function createUnexpectedPromptGuards() {
+function createPrompter(overrides: Partial<WizardPrompter>): WizardPrompter {
   return {
-    multiselect: vi.fn(async () => {
-      throw new Error("unexpected multiselect");
-    }),
-    text: vi.fn(async ({ message }: { message: string }) => {
-      throw new Error(`unexpected text prompt: ${message}`);
-    }) as unknown as WizardPrompter["text"],
+    intro: vi.fn(noopAsync),
+    outro: vi.fn(noopAsync),
+    note: vi.fn(noopAsync),
+    select: vi.fn(async () => "__done__" as never),
+    multiselect: vi.fn(async () => []),
+    text: vi.fn(async () => "") as unknown as WizardPrompter["text"],
+    confirm: vi.fn(async () => false),
+    progress: vi.fn(() => ({ update: vi.fn(), stop: vi.fn() })),
+    ...overrides,
   };
 }
 
@@ -44,7 +56,16 @@ vi.mock("./onboard-helpers.js", () => ({
 
 describe("setupChannels", () => {
   beforeEach(() => {
-    setDefaultChannelPluginRegistryForTests();
+    setActivePluginRegistry(
+      createTestRegistry([
+        { pluginId: "discord", plugin: discordPlugin, source: "test" },
+        { pluginId: "slack", plugin: slackPlugin, source: "test" },
+        { pluginId: "telegram", plugin: telegramPlugin, source: "test" },
+        { pluginId: "whatsapp", plugin: whatsappPlugin, source: "test" },
+        { pluginId: "signal", plugin: signalPlugin, source: "test" },
+        { pluginId: "imessage", plugin: imessagePlugin, source: "test" },
+      ]),
+    );
   });
   it("QuickStart uses single-select (no multiselect) and doesn't prompt for Telegram token when WhatsApp is chosen", async () => {
     const select = vi.fn(async () => "whatsapp");
@@ -62,12 +83,12 @@ describe("setupChannels", () => {
     });
 
     const prompter = createPrompter({
-      select: select as unknown as WizardPrompter["select"],
+      select,
       multiselect,
       text: text as unknown as WizardPrompter["text"],
     });
 
-    const runtime = createExitThrowingRuntime();
+    const runtime = createRuntime();
 
     await setupChannels({} as OpenClawConfig, runtime, prompter, {
       skipConfirm: true,
@@ -82,18 +103,23 @@ describe("setupChannels", () => {
   });
 
   it("shows explicit dmScope config command in channel primer", async () => {
-    const note = vi.fn(async (_message?: string, _title?: string) => {});
+    const note = vi.fn(async () => {});
     const select = vi.fn(async () => "__done__");
-    const { multiselect, text } = createUnexpectedPromptGuards();
+    const multiselect = vi.fn(async () => {
+      throw new Error("unexpected multiselect");
+    });
+    const text = vi.fn(async ({ message }: { message: string }) => {
+      throw new Error(`unexpected text prompt: ${message}`);
+    });
 
     const prompter = createPrompter({
       note,
-      select: select as unknown as WizardPrompter["select"],
+      select,
       multiselect,
-      text,
+      text: text as unknown as WizardPrompter["text"],
     });
 
-    const runtime = createExitThrowingRuntime();
+    const runtime = createRuntime();
 
     await setupChannels({} as OpenClawConfig, runtime, prompter, {
       skipConfirm: true,
@@ -118,15 +144,20 @@ describe("setupChannels", () => {
       }
       throw new Error(`unexpected select prompt: ${message}`);
     });
-    const { multiselect, text } = createUnexpectedPromptGuards();
-
-    const prompter = createPrompter({
-      select: select as unknown as WizardPrompter["select"],
-      multiselect,
-      text,
+    const multiselect = vi.fn(async () => {
+      throw new Error("unexpected multiselect");
+    });
+    const text = vi.fn(async ({ message }: { message: string }) => {
+      throw new Error(`unexpected text prompt: ${message}`);
     });
 
-    const runtime = createExitThrowingRuntime();
+    const prompter = createPrompter({
+      select,
+      multiselect,
+      text: text as unknown as WizardPrompter["text"],
+    });
+
+    const runtime = createRuntime();
 
     await setupChannels(
       {
@@ -173,12 +204,12 @@ describe("setupChannels", () => {
       throw new Error("unexpected multiselect");
     });
     const prompter = createPrompter({
-      select: select as unknown as WizardPrompter["select"],
+      select,
       multiselect,
       text: vi.fn(async () => "") as unknown as WizardPrompter["text"],
     });
 
-    const runtime = createExitThrowingRuntime();
+    const runtime = createRuntime();
 
     await setupChannels(
       {

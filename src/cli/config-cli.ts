@@ -280,9 +280,7 @@ export async function runConfigUnset(opts: { path: string; runtime?: RuntimeEnv 
 export function registerConfigCli(program: Command) {
   const cmd = program
     .command("config")
-    .description(
-      "Non-interactive config helpers (get/set/unset). Run without subcommand for the setup wizard.",
-    )
+    .description("Config helpers (get/set/unset). Run without subcommand for the wizard.")
     .addHelpText(
       "after",
       () =>

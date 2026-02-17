@@ -67,51 +67,24 @@ export const CronPayloadPatchSchema = Type.Union([
   cronAgentTurnPayloadSchema({ message: Type.Optional(NonEmptyString) }),
 ]);
 
-const CronDeliverySharedProperties = {
+const CronDeliveryBaseProperties = {
   channel: Type.Optional(Type.Union([Type.Literal("last"), NonEmptyString])),
+  to: Type.Optional(Type.String()),
   bestEffort: Type.Optional(Type.Boolean()),
 };
 
-const CronDeliveryNoopSchema = Type.Object(
+export const CronDeliverySchema = Type.Object(
   {
-    mode: Type.Literal("none"),
-    ...CronDeliverySharedProperties,
-    to: Type.Optional(Type.String()),
+    mode: Type.Union([Type.Literal("none"), Type.Literal("announce")]),
+    ...CronDeliveryBaseProperties,
   },
   { additionalProperties: false },
 );
-
-const CronDeliveryAnnounceSchema = Type.Object(
-  {
-    mode: Type.Literal("announce"),
-    ...CronDeliverySharedProperties,
-    to: Type.Optional(Type.String()),
-  },
-  { additionalProperties: false },
-);
-
-const CronDeliveryWebhookSchema = Type.Object(
-  {
-    mode: Type.Literal("webhook"),
-    ...CronDeliverySharedProperties,
-    to: NonEmptyString,
-  },
-  { additionalProperties: false },
-);
-
-export const CronDeliverySchema = Type.Union([
-  CronDeliveryNoopSchema,
-  CronDeliveryAnnounceSchema,
-  CronDeliveryWebhookSchema,
-]);
 
 export const CronDeliveryPatchSchema = Type.Object(
   {
-    mode: Type.Optional(
-      Type.Union([Type.Literal("none"), Type.Literal("announce"), Type.Literal("webhook")]),
-    ),
-    ...CronDeliverySharedProperties,
-    to: Type.Optional(Type.String()),
+    mode: Type.Optional(Type.Union([Type.Literal("none"), Type.Literal("announce")])),
+    ...CronDeliveryBaseProperties,
   },
   { additionalProperties: false },
 );
@@ -135,10 +108,10 @@ export const CronJobSchema = Type.Object(
   {
     id: NonEmptyString,
     agentId: Type.Optional(NonEmptyString),
-    sessionKey: Type.Optional(NonEmptyString),
     name: NonEmptyString,
     description: Type.Optional(Type.String()),
     enabled: Type.Boolean(),
+    notify: Type.Optional(Type.Boolean()),
     deleteAfterRun: Type.Optional(Type.Boolean()),
     createdAtMs: Type.Integer({ minimum: 0 }),
     updatedAtMs: Type.Integer({ minimum: 0 }),
@@ -165,9 +138,9 @@ export const CronAddParamsSchema = Type.Object(
   {
     name: NonEmptyString,
     agentId: Type.Optional(Type.Union([NonEmptyString, Type.Null()])),
-    sessionKey: Type.Optional(Type.Union([NonEmptyString, Type.Null()])),
     description: Type.Optional(Type.String()),
     enabled: Type.Optional(Type.Boolean()),
+    notify: Type.Optional(Type.Boolean()),
     deleteAfterRun: Type.Optional(Type.Boolean()),
     schedule: CronScheduleSchema,
     sessionTarget: Type.Union([Type.Literal("main"), Type.Literal("isolated")]),
@@ -182,9 +155,9 @@ export const CronJobPatchSchema = Type.Object(
   {
     name: Type.Optional(NonEmptyString),
     agentId: Type.Optional(Type.Union([NonEmptyString, Type.Null()])),
-    sessionKey: Type.Optional(Type.Union([NonEmptyString, Type.Null()])),
     description: Type.Optional(Type.String()),
     enabled: Type.Optional(Type.Boolean()),
+    notify: Type.Optional(Type.Boolean()),
     deleteAfterRun: Type.Optional(Type.Boolean()),
     schedule: Type.Optional(CronScheduleSchema),
     sessionTarget: Type.Optional(Type.Union([Type.Literal("main"), Type.Literal("isolated")])),

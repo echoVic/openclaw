@@ -6,35 +6,9 @@ import { resolveOpenClawAgentDir } from "./agent-paths.js";
 import { ensureOpenClawModelsJson } from "./models-config.js";
 
 type ModelEntry = { id: string; contextWindow?: number };
-type ModelRegistryLike = {
-  getAvailable?: () => ModelEntry[];
-  getAll: () => ModelEntry[];
-};
 type ConfigModelEntry = { id?: string; contextWindow?: number };
 type ProviderConfigEntry = { models?: ConfigModelEntry[] };
 type ModelsConfig = { providers?: Record<string, ProviderConfigEntry | undefined> };
-
-export function applyDiscoveredContextWindows(params: {
-  cache: Map<string, number>;
-  models: ModelEntry[];
-}) {
-  for (const model of params.models) {
-    if (!model?.id) {
-      continue;
-    }
-    const contextWindow =
-      typeof model.contextWindow === "number" ? Math.trunc(model.contextWindow) : undefined;
-    if (!contextWindow || contextWindow <= 0) {
-      continue;
-    }
-    const existing = params.cache.get(model.id);
-    // When multiple providers expose the same model id with different limits,
-    // prefer the smaller window so token budgeting is fail-safe (no overestimation).
-    if (existing === undefined || contextWindow < existing) {
-      params.cache.set(model.id, contextWindow);
-    }
-  }
-}
 
 export function applyConfiguredContextWindows(params: {
   cache: Map<string, number>;
@@ -80,15 +54,24 @@ const loadPromise = (async () => {
     const { discoverAuthStorage, discoverModels } = await import("./pi-model-discovery.js");
     const agentDir = resolveOpenClawAgentDir();
     const authStorage = discoverAuthStorage(agentDir);
-    const modelRegistry = discoverModels(authStorage, agentDir) as unknown as ModelRegistryLike;
-    const models =
+    const modelRegistry = discoverModels(authStorage, agentDir);
+    // Use getAvailable() to filter to only providers with configured auth.
+    // This prevents cross-provider model ID collisions where the same model ID
+    // exists under multiple providers with different contextWindow values
+    // (e.g. claude-sonnet-4-5 at 200k vs 1M). See #17586.
+    const models = (
       typeof modelRegistry.getAvailable === "function"
         ? modelRegistry.getAvailable()
-        : modelRegistry.getAll();
-    applyDiscoveredContextWindows({
-      cache: MODEL_CACHE,
-      models,
-    });
+        : modelRegistry.getAll()
+    ) as ModelEntry[];
+    for (const m of models) {
+      if (!m?.id) {
+        continue;
+      }
+      if (typeof m.contextWindow === "number" && m.contextWindow > 0) {
+        MODEL_CACHE.set(m.id, m.contextWindow);
+      }
+    }
   } catch {
     // If model discovery fails, continue with config overrides only.
   }

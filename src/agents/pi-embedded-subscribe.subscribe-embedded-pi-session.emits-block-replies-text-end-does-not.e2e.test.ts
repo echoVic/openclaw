@@ -1,27 +1,31 @@
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { describe, expect, it, vi } from "vitest";
-import { createStubSessionHarness } from "./pi-embedded-subscribe.e2e-harness.js";
 import { subscribeEmbeddedPiSession } from "./pi-embedded-subscribe.js";
 
+type StubSession = {
+  subscribe: (fn: (evt: unknown) => void) => () => void;
+};
+
 describe("subscribeEmbeddedPiSession", () => {
-  function createTextEndBlockReplyHarness() {
-    const { session, emit } = createStubSessionHarness();
+  it("emits block replies on text_end and does not duplicate on message_end", () => {
+    let handler: ((evt: unknown) => void) | undefined;
+    const session: StubSession = {
+      subscribe: (fn) => {
+        handler = fn;
+        return () => {};
+      },
+    };
+
     const onBlockReply = vi.fn();
 
     const subscription = subscribeEmbeddedPiSession({
-      session,
+      session: session as unknown as Parameters<typeof subscribeEmbeddedPiSession>[0]["session"],
       runId: "run",
       onBlockReply,
       blockReplyBreak: "text_end",
     });
 
-    return { emit, onBlockReply, subscription };
-  }
-
-  it("emits block replies on text_end and does not duplicate on message_end", () => {
-    const { emit, onBlockReply, subscription } = createTextEndBlockReplyHarness();
-
-    emit({
+    handler?.({
       type: "message_update",
       message: { role: "assistant" },
       assistantMessageEvent: {
@@ -30,7 +34,7 @@ describe("subscribeEmbeddedPiSession", () => {
       },
     });
 
-    emit({
+    handler?.({
       type: "message_update",
       message: { role: "assistant" },
       assistantMessageEvent: {
@@ -48,17 +52,32 @@ describe("subscribeEmbeddedPiSession", () => {
       content: [{ type: "text", text: "Hello block" }],
     } as AssistantMessage;
 
-    emit({ type: "message_end", message: assistantMessage });
+    handler?.({ type: "message_end", message: assistantMessage });
 
     expect(onBlockReply).toHaveBeenCalledTimes(1);
     expect(subscription.assistantTexts).toEqual(["Hello block"]);
   });
   it("does not duplicate when message_end flushes and a late text_end arrives", () => {
-    const { emit, onBlockReply, subscription } = createTextEndBlockReplyHarness();
+    let handler: ((evt: unknown) => void) | undefined;
+    const session: StubSession = {
+      subscribe: (fn) => {
+        handler = fn;
+        return () => {};
+      },
+    };
 
-    emit({ type: "message_start", message: { role: "assistant" } });
+    const onBlockReply = vi.fn();
 
-    emit({
+    const subscription = subscribeEmbeddedPiSession({
+      session: session as unknown as Parameters<typeof subscribeEmbeddedPiSession>[0]["session"],
+      runId: "run",
+      onBlockReply,
+      blockReplyBreak: "text_end",
+    });
+
+    handler?.({ type: "message_start", message: { role: "assistant" } });
+
+    handler?.({
       type: "message_update",
       message: { role: "assistant" },
       assistantMessageEvent: {
@@ -73,13 +92,13 @@ describe("subscribeEmbeddedPiSession", () => {
     } as AssistantMessage;
 
     // Simulate a provider that ends the message without emitting text_end.
-    emit({ type: "message_end", message: assistantMessage });
+    handler?.({ type: "message_end", message: assistantMessage });
 
     expect(onBlockReply).toHaveBeenCalledTimes(1);
     expect(subscription.assistantTexts).toEqual(["Hello block"]);
 
     // Some providers can still emit a late text_end; this must not re-emit.
-    emit({
+    handler?.({
       type: "message_update",
       message: { role: "assistant" },
       assistantMessageEvent: {
