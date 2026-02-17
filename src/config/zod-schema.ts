@@ -404,9 +404,9 @@ export const OpenClawSchema = z
             allowTailscale: z.boolean().optional(),
             rateLimit: z
               .object({
-                maxAttempts: z.number().optional(),
-                windowMs: z.number().optional(),
-                lockoutMs: z.number().optional(),
+                maxAttempts: z.number().int().positive().optional(),
+                windowMs: z.number().positive().optional(),
+                lockoutMs: z.number().positive().optional(),
                 exemptLoopback: z.boolean().optional(),
               })
               .strict()
