@@ -670,6 +670,26 @@ async function processMessageWithPipeline(params: {
       runtime.error?.(`googlechat: failed updating session meta: ${String(err)}`);
     });
 
+  // Record the original-case space ID in the delivery context.
+  // Google Chat space IDs are case-sensitive; the session key is lowercased, so we must
+  // persist the original-case target via updateLastRoute to ensure outbound replies use
+  // the correct casing (fixes #15790).
+  void core.channel.session
+    .updateLastRoute({
+      storePath,
+      sessionKey: route.mainSessionKey,
+      deliveryContext: {
+        channel: "googlechat",
+        to: `googlechat:${spaceId}`,
+        accountId: route.accountId,
+        threadId: message.thread?.name,
+      },
+      ctx: ctxPayload,
+    })
+    .catch((err) => {
+      runtime.error?.(`googlechat: failed updating last route: ${String(err)}`);
+    });
+
   // Typing indicator setup
   // Note: Reaction mode requires user OAuth, not available with service account auth.
   // If reaction is configured, we fall back to message mode with a warning.
