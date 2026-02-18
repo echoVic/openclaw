@@ -3,6 +3,7 @@ import {
   readStringArrayParam,
   readStringOrNumberParam,
   readStringParam,
+  jsonResult,
 } from "../../../agents/tools/common.js";
 import { handleTelegramAction } from "../../../agents/tools/telegram-actions.js";
 import type { TelegramActionConfig } from "../../../config/types.telegram.js";
@@ -249,7 +250,7 @@ export const telegramMessageActions: ChannelMessageActionAdapter = {
           messageThreadId: messageThreadId ?? undefined,
         },
       );
-      return { ok: true, ...result };
+      return jsonResult({ ok: true, ...result });
     }
 
     throw new Error(`Action ${action} is not supported for provider ${providerId}.`);
