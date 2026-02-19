@@ -691,10 +691,20 @@ export function isMissingToolCallInputError(raw: string): boolean {
 }
 
 const MALFORMED_JSON_RE =
-  /unexpected (?:token|non-whitespace|character|end of json|number)|unterminated string|bad control character|expected (?:property name|'[,}]'|double-quoted)|json (?:parse|syntax)|syntaxerror.*json/i;
+  /(?:tool_use|tool.call|tool_input|input.*json|parse.*tool|tool.*parse).*(?:unexpected (?:token|non-whitespace|character|end of json|number)|unterminated string|bad control character|expected (?:property name|'[,}]'|double-quoted)|json (?:parse|syntax)|syntaxerror)|(?:unexpected (?:token|non-whitespace|character|end of json)|unterminated string|expected (?:property name|'[,}]'|double-quoted)|json (?:parse|syntax)|syntaxerror).*(?:tool_use|tool.call|tool_input)/i;
 
 export function isMalformedToolCallError(raw: string): boolean {
   if (!raw) {
+    return false;
+  }
+  // Fast path: must mention both JSON-parse-like errors AND tool context
+  const lower = raw.toLowerCase();
+  const hasToolContext =
+    lower.includes("tool_use") ||
+    lower.includes("tool_call") ||
+    lower.includes("tool_input") ||
+    lower.includes("tool call");
+  if (!hasToolContext) {
     return false;
   }
   return MALFORMED_JSON_RE.test(raw);
