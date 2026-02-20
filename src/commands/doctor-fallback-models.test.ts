@@ -60,6 +60,7 @@ describe("noteFallbackModelHealth", () => {
           "kimi-coding": {
             baseUrl: "https://api.kimi.example.com",
             apiKey: "test-key",
+            models: [{ id: "k2p5", name: "K2P5" }],
           },
         },
       },
