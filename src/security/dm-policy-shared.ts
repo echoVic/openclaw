@@ -6,6 +6,9 @@ export function resolveEffectiveAllowFromLists(params: {
   allowFrom?: Array<string | number> | null;
   groupAllowFrom?: Array<string | number> | null;
   storeAllowFrom?: Array<string | number> | null;
+  /** When dmPolicy is "allowlist", persisted pairings are excluded so that
+   *  only the explicit config allowFrom list is enforced (#22599). */
+  dmPolicy?: string | null;
 }): {
   effectiveAllowFrom: string[];
   effectiveGroupAllowFrom: string[];
@@ -16,9 +19,14 @@ export function resolveEffectiveAllowFromLists(params: {
   const configGroupAllowFrom = normalizeStringEntries(
     Array.isArray(params.groupAllowFrom) ? params.groupAllowFrom : undefined,
   );
-  const storeAllowFrom = normalizeStringEntries(
-    Array.isArray(params.storeAllowFrom) ? params.storeAllowFrom : undefined,
-  );
+  // When dmPolicy is "allowlist", persisted pairings must NOT be merged —
+  // only the explicit config allowFrom list should be enforced (#22599).
+  const storeAllowFrom =
+    params.dmPolicy === "allowlist"
+      ? []
+      : normalizeStringEntries(
+          Array.isArray(params.storeAllowFrom) ? params.storeAllowFrom : undefined,
+        );
   const effectiveAllowFrom = normalizeStringEntries([...configAllowFrom, ...storeAllowFrom]);
   const groupBase = configGroupAllowFrom.length > 0 ? configGroupAllowFrom : configAllowFrom;
   const effectiveGroupAllowFrom = normalizeStringEntries([...groupBase, ...storeAllowFrom]);

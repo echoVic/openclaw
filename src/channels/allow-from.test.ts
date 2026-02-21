@@ -10,6 +10,35 @@ describe("mergeAllowFromSources", () => {
       }),
     ).toEqual(["line:user:abc", "123", "telegram:456"]);
   });
+
+  it("excludes storeAllowFrom when dmPolicy is allowlist (#22599)", () => {
+    expect(
+      mergeAllowFromSources({
+        allowFrom: ["+1111"],
+        storeAllowFrom: ["+2222", "+3333"],
+        dmPolicy: "allowlist",
+      }),
+    ).toEqual(["+1111"]);
+  });
+
+  it("includes storeAllowFrom when dmPolicy is pairing", () => {
+    expect(
+      mergeAllowFromSources({
+        allowFrom: ["+1111"],
+        storeAllowFrom: ["+2222"],
+        dmPolicy: "pairing",
+      }),
+    ).toEqual(["+1111", "+2222"]);
+  });
+
+  it("includes storeAllowFrom when dmPolicy is undefined", () => {
+    expect(
+      mergeAllowFromSources({
+        allowFrom: ["+1111"],
+        storeAllowFrom: ["+2222"],
+      }),
+    ).toEqual(["+1111", "+2222"]);
+  });
 });
 
 describe("firstDefined", () => {

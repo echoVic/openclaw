@@ -178,7 +178,10 @@ export async function preflightDiscordMessage(
       return null;
     }
     if (dmPolicy !== "open") {
-      const storeAllowFrom = await readChannelAllowFromStore("discord").catch(() => []);
+      // When dmPolicy is "allowlist", only use config allowFrom — do NOT merge
+      // persisted pairings, which would bypass the explicit allowlist (#22599).
+      const storeAllowFrom =
+        dmPolicy !== "allowlist" ? await readChannelAllowFromStore("discord").catch(() => []) : [];
       const effectiveAllowFrom = [...(params.allowFrom ?? []), ...storeAllowFrom];
       const allowList = normalizeDiscordAllowList(effectiveAllowFrom, ["discord:", "user:", "pk:"]);
       const allowMatch = allowList

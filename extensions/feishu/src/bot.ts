@@ -629,8 +629,10 @@ export async function handleFeishuMessage(params: {
       ctx.content,
       cfg,
     );
+    // When dmPolicy is "allowlist", only use config allowFrom — do NOT merge
+    // persisted pairings, which would bypass the explicit allowlist (#22599).
     const storeAllowFrom =
-      !isGroup && (dmPolicy !== "open" || shouldComputeCommandAuthorized)
+      !isGroup && dmPolicy !== "open" && dmPolicy !== "allowlist"
         ? await core.channel.pairing.readAllowFromStore("feishu").catch(() => [])
         : [];
     const effectiveDmAllowFrom = [...configAllowFrom, ...storeAllowFrom];

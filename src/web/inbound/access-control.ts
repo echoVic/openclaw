@@ -40,11 +40,12 @@ export async function checkInboundAccessControl(params: {
   });
   const dmPolicy = account.dmPolicy ?? "pairing";
   const configuredAllowFrom = account.allowFrom;
-  const storeAllowFrom = await readChannelAllowFromStore(
-    "whatsapp",
-    process.env,
-    account.accountId,
-  ).catch(() => []);
+  // When dmPolicy is "allowlist", only use config allowFrom — do NOT merge
+  // persisted pairings, which would bypass the explicit allowlist (#22599).
+  const storeAllowFrom =
+    dmPolicy !== "allowlist"
+      ? await readChannelAllowFromStore("whatsapp", process.env, account.accountId).catch(() => [])
+      : [];
   // Without user config, default to self-only DM access so the owner can talk to themselves.
   const combinedAllowFrom = Array.from(
     new Set([...(configuredAllowFrom ?? []), ...storeAllowFrom]),

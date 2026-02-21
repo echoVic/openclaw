@@ -1,8 +1,12 @@
 export function mergeAllowFromSources(params: {
   allowFrom?: Array<string | number>;
   storeAllowFrom?: string[];
+  /** When dmPolicy is "allowlist", persisted pairings are excluded so that
+   *  only the explicit config allowFrom list is enforced (#22599). */
+  dmPolicy?: string;
 }): string[] {
-  return [...(params.allowFrom ?? []), ...(params.storeAllowFrom ?? [])]
+  const storeEntries = params.dmPolicy === "allowlist" ? [] : (params.storeAllowFrom ?? []);
+  return [...(params.allowFrom ?? []), ...storeEntries]
     .map((value) => String(value).trim())
     .filter(Boolean);
 }
