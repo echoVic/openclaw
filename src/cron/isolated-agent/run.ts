@@ -264,11 +264,15 @@ export async function runCronIsolatedAgentTurn(params: {
     model = resolvedOverride.ref.model;
   }
   const now = Date.now();
+  const isIsolatedSession = params.job.sessionTarget === "isolated";
   const cronSession = resolveCronSession({
     cfg: params.cfg,
     sessionKey: agentSessionKey,
     agentId,
     nowMs: now,
+    // Isolated sessions must generate a fresh UUID on every run so that
+    // no context leaks between supposedly independent executions (#23470).
+    forceNew: isIsolatedSession,
   });
   const runSessionId = cronSession.sessionEntry.sessionId;
   const runSessionKey = baseSessionKey.startsWith("cron:")
