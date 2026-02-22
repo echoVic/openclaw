@@ -979,8 +979,10 @@ export async function runEmbeddedPiAgent(
 
               if (!isProbeSession) {
                 log.warn(
-                  `Profile ${lastProfileId} timed out (attempt ${consecutiveTimeouts}/${maxRetries + 1}). ` +
-                    `Retrying same profile after ${delayMs}ms...`,
+                  `[auth-retry] Profile ${lastProfileId} timed out ` +
+                    `(attempt ${consecutiveTimeouts}/${maxRetries + 1}, ` +
+                    `provider=${provider}, model=${modelId}). ` +
+                    `Retrying same profile in ${delayMs}ms...`,
                 );
               }
 
@@ -991,8 +993,9 @@ export async function runEmbeddedPiAgent(
             // Retries exhausted, proceed with rotation
             if (!isProbeSession) {
               log.warn(
-                `Profile ${lastProfileId} timed out after ${consecutiveTimeouts} attempts. ` +
-                  `Rotating to next account...`,
+                `[auth-retry] Profile ${lastProfileId} exhausted ${consecutiveTimeouts} retry attempts ` +
+                  `(provider=${provider}, model=${modelId}). ` +
+                  `Applying cooldown and rotating to next account...`,
               );
             }
           }
@@ -1068,6 +1071,14 @@ export async function runEmbeddedPiAgent(
                 status,
               });
             }
+          }
+
+          // Log successful retry if we recovered from timeouts
+          if (consecutiveTimeouts > 0 && lastProfileId) {
+            log.info(
+              `[auth-retry] Profile ${lastProfileId} recovered after ${consecutiveTimeouts} timeout(s) ` +
+                `(provider=${provider}, model=${modelId})`,
+            );
           }
 
           const usage = toNormalizedUsage(usageAccumulator);
