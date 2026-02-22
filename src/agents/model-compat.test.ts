@@ -45,4 +45,31 @@ describe("normalizeModelCompat", () => {
       (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
     ).toBe(false);
   });
+
+  it("forces supportsDeveloperRole off for bailian/dashscope provider", () => {
+    const model = {
+      ...baseModel(),
+      provider: "bailian",
+      baseUrl: "https://coding.dashscope.aliyuncs.com/v1",
+    };
+    delete (model as { compat?: unknown }).compat;
+    const normalized = normalizeModelCompat(model);
+    expect(
+      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
+    ).toBe(false);
+  });
+
+  it("forces supportsDeveloperRole off for qwen models via any provider", () => {
+    const model = {
+      ...baseModel(),
+      provider: "custom",
+      baseUrl: "https://my-proxy.example.com/v1",
+      modelId: "qwen3.5-plus",
+    };
+    delete (model as { compat?: unknown }).compat;
+    const normalized = normalizeModelCompat(model);
+    expect(
+      (normalized.compat as { supportsDeveloperRole?: boolean } | undefined)?.supportsDeveloperRole,
+    ).toBe(false);
+  });
 });
