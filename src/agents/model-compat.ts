@@ -11,7 +11,7 @@ function isOpenAiCompletionsModel(model: Model<Api>): model is Model<"openai-com
 function needsDeveloperRoleDisabled(model: Model<"openai-completions">): boolean {
   const provider = (model.provider ?? "").toLowerCase();
   const baseUrl = (model.baseUrl ?? "").toLowerCase();
-  const modelId = (model.modelId ?? "").toLowerCase();
+  const modelId = (model.id ?? "").toLowerCase();
 
   // z.ai
   if (provider === "zai" || baseUrl.includes("api.z.ai")) {

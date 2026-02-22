@@ -62,9 +62,9 @@ describe("normalizeModelCompat", () => {
   it("forces supportsDeveloperRole off for qwen models via any provider", () => {
     const model = {
       ...baseModel(),
+      id: "qwen3.5-plus",
       provider: "custom",
       baseUrl: "https://my-proxy.example.com/v1",
-      modelId: "qwen3.5-plus",
     };
     delete (model as { compat?: unknown }).compat;
     const normalized = normalizeModelCompat(model);
