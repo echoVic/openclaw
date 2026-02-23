@@ -33,8 +33,8 @@ type ModelSelectionState = {
   allowedModelCatalog: ModelCatalog;
   resetModelOverride: boolean;
   resolveDefaultThinkingLevel: () => Promise<ThinkLevel>;
-  /** Default reasoning level from model capability: "on" if model has reasoning, else "off". */
-  resolveDefaultReasoningLevel: () => Promise<"on" | "off">;
+  /** Default reasoning level from model capability or config override. */
+  resolveDefaultReasoningLevel: () => Promise<"on" | "off" | "stream">;
   needsModelCatalog: boolean;
 };
 
@@ -400,7 +400,7 @@ export async function createModelSelectionState(params: {
     return defaultThinkingLevel;
   };
 
-  const resolveDefaultReasoningLevel = async (): Promise<"on" | "off"> => {
+  const resolveDefaultReasoningLevel = async (): Promise<"on" | "off" | "stream"> => {
     let catalogForReasoning = modelCatalog ?? allowedModelCatalog;
     if (!catalogForReasoning || catalogForReasoning.length === 0) {
       modelCatalog = await loadModelCatalog({ config: cfg });
@@ -410,6 +410,7 @@ export async function createModelSelectionState(params: {
       provider,
       model,
       catalog: catalogForReasoning,
+      configReasoningDefault: agentCfg?.reasoningDefault,
     });
   };
 

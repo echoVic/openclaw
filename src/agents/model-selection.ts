@@ -529,12 +529,22 @@ export function resolveThinkingDefault(params: {
   return "off";
 }
 
-/** Default reasoning level when session/directive do not set it: "on" if model supports reasoning, else "off". */
+/** Default reasoning level when session/directive do not set it.
+ *  Priority: config `reasoningDefault` > model catalog `reasoning` flag > "off". */
 export function resolveReasoningDefault(params: {
   provider: string;
   model: string;
   catalog?: ModelCatalogEntry[];
-}): "on" | "off" {
+  configReasoningDefault?: string;
+}): "on" | "off" | "stream" {
+  // Config override takes priority over model-catalog auto-detection (#24543).
+  if (
+    params.configReasoningDefault === "on" ||
+    params.configReasoningDefault === "off" ||
+    params.configReasoningDefault === "stream"
+  ) {
+    return params.configReasoningDefault;
+  }
   const key = modelKey(params.provider, params.model);
   const candidate = params.catalog?.find(
     (entry) =>
