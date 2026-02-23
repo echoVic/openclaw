@@ -816,11 +816,15 @@ export async function runCronIsolatedAgentTurn(params: {
         } else {
           const message = "cron announce delivery failed";
           if (!deliveryBestEffort) {
+            // Agent execution succeeded but delivery failed. Report as ok with
+            // delivery-target errorKind so the job is not marked as a hard error
+            // (which would increment consecutiveErrors and trigger backoff).
+            // The delivery failure is tracked separately via lastDeliveryStatus.
             return withRunSession({
-              status: "error",
+              status: "ok",
               summary,
               outputText,
-              error: message,
+              delivered: false,
               ...telemetry,
             });
           }
@@ -828,11 +832,13 @@ export async function runCronIsolatedAgentTurn(params: {
         }
       } catch (err) {
         if (!deliveryBestEffort) {
+          // Same as above: execution succeeded, only delivery threw.
+          logWarn(`[cron:${params.job.id}] announce delivery error: ${String(err)}`);
           return withRunSession({
-            status: "error",
+            status: "ok",
             summary,
             outputText,
-            error: String(err),
+            delivered: false,
             ...telemetry,
           });
         }
