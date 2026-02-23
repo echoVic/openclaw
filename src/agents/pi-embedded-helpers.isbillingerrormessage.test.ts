@@ -191,7 +191,7 @@ describe("isContextOverflowError", () => {
 
   it("matches exceed/context/max_tokens overflow variants", () => {
     const samples = [
-      "input length and max_tokens exceed context limit: 156321 + 48384 > 200000",
+      "input length and max_tokens exceed context limit (i.e 156321 + 48384 > 200000)",
       "This request exceeds the model's maximum context length",
       "LLM request rejected: max_tokens would exceed context window",
       "input length would exceed context budget for this model",
