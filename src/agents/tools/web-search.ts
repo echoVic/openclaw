@@ -243,14 +243,41 @@ function toShortLangCode(lang: string): string {
 }
 
 /**
- * Convert a language code to locale format (e.g. "tr" → "tr-TR", "en" → "en-EN", "tr-TR" → "tr-TR").
- * Brave Search API expects `ui_lang` in locale format.
+ * Convert a language code to locale format for Brave Search API `ui_lang`.
+ * Uses a lookup for common languages where the region differs from the language code
+ * (e.g. "en" → "en-US", "zh" → "zh-CN"). Falls back to duplicating the code
+ * (e.g. "tr" → "tr-TR", "de" → "de-DE") which is valid for most languages.
+ * If already in locale format, passes through (e.g. "tr-TR" → "tr-TR").
  */
+const LANG_TO_DEFAULT_LOCALE: Record<string, string> = {
+  en: "en-US",
+  zh: "zh-CN",
+  ja: "ja-JP",
+  ko: "ko-KR",
+  ar: "ar-SA",
+  he: "he-IL",
+  uk: "uk-UA",
+  cs: "cs-CZ",
+  da: "da-DK",
+  el: "el-GR",
+  et: "et-EE",
+  fa: "fa-IR",
+  ga: "ga-IE",
+  hi: "hi-IN",
+  nb: "nb-NO",
+  nn: "nn-NO",
+  sl: "sl-SI",
+  sv: "sv-SE",
+  vi: "vi-VN",
+};
+
 function toLocaleLangCode(lang: string): string {
   const parts = lang.split(/[-_]/);
   const base = parts[0].toLowerCase();
-  const region = parts[1] ? parts[1].toUpperCase() : base.toUpperCase();
-  return `${base}-${region}`;
+  if (parts[1]) {
+    return `${base}-${parts[1].toUpperCase()}`;
+  }
+  return LANG_TO_DEFAULT_LOCALE[base] ?? `${base}-${base.toUpperCase()}`;
 }
 
 function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDERS)[number] {
