@@ -110,13 +110,13 @@ describe("web_search country and language parameters", () => {
   }
 
   it.each([
-    { key: "country", value: "DE" },
-    { key: "search_lang", value: "de" },
-    { key: "ui_lang", value: "de" },
-    { key: "freshness", value: "pw" },
-  ])("passes $key parameter to Brave API", async ({ key, value }) => {
+    { key: "country", value: "DE", expected: "DE" },
+    { key: "search_lang", value: "de", expected: "de" },
+    { key: "ui_lang", value: "de", expected: "de-DE" },
+    { key: "freshness", value: "pw", expected: "pw" },
+  ])("passes $key parameter to Brave API", async ({ key, value, expected }) => {
     const url = await runBraveSearchAndGetUrl({ [key]: value });
-    expect(url.searchParams.get(key)).toBe(value);
+    expect(url.searchParams.get(key)).toBe(expected);
   });
 
   it("rejects invalid freshness values", async () => {
