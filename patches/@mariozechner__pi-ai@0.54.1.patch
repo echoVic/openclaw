@@ -1,0 +1,36 @@
+diff --git a/dist/providers/amazon-bedrock.js b/dist/providers/amazon-bedrock.js
+index 187591428a19740ea3977582ceaa2629fd7de81d..737432df1d23e9a571cca9da4a015edf92155296 100644
+--- a/dist/providers/amazon-bedrock.js
++++ b/dist/providers/amazon-bedrock.js
+@@ -396,9 +396,12 @@ function convertMessages(context, model, cacheRetention) {
+                             // For other models, we omit the signature to avoid errors like:
+                             // "This model doesn't support the reasoningContent.reasoningText.signature field"
+                             if (supportsThinkingSignature(model)) {
++                                // Do not sanitize thinking text when a signature is present.
++                                // The API requires thinking blocks to be returned verbatim;
++                                // modifying the text invalidates the cryptographic signature.
+                                 contentBlocks.push({
+                                     reasoningContent: {
+-                                        reasoningText: { text: sanitizeSurrogates(c.thinking), signature: c.thinkingSignature },
++                                        reasoningText: { text: c.thinkingSignature ? c.thinking : sanitizeSurrogates(c.thinking), signature: c.thinkingSignature },
+                                     },
+                                 });
+                             }
+diff --git a/dist/providers/anthropic.js b/dist/providers/anthropic.js
+index 0bf2b894799bbc9ef5fda07bc44ea4301c9f395a..b7a77c9946ee439682df0b6846d6d6df23030b22 100644
+--- a/dist/providers/anthropic.js
++++ b/dist/providers/anthropic.js
+@@ -584,9 +584,12 @@ function convertMessages(messages, model, isOAuthToken, cacheControl) {
+                         });
+                     }
+                     else {
++                        // Do not sanitize thinking text when a signature is present.
++                        // The Anthropic API requires thinking blocks to be returned verbatim;
++                        // modifying the text invalidates the cryptographic signature.
+                         blocks.push({
+                             type: "thinking",
+-                            thinking: sanitizeSurrogates(block.thinking),
++                            thinking: block.thinkingSignature ? block.thinking : sanitizeSurrogates(block.thinking),
+                             signature: block.thinkingSignature,
+                         });
+                     }
