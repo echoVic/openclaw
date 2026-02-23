@@ -191,6 +191,9 @@ async function resizeImageBase64IfNeeded(params: {
   const cacheKey = resizeCacheKey(params.base64, params.maxDimensionPx, params.maxBytes);
   const cached = resizeCache.get(cacheKey);
   if (cached) {
+    // Move to end for LRU behavior (Map iteration order = insertion order).
+    resizeCache.delete(cacheKey);
+    resizeCache.set(cacheKey, cached);
     return cached;
   }
 
