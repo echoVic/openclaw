@@ -234,6 +234,25 @@ function missingSearchKeyPayload(provider: (typeof SEARCH_PROVIDERS)[number]) {
   };
 }
 
+/**
+ * Convert a language code to short format (e.g. "tr-TR" → "tr", "tr" → "tr").
+ * Brave Search API expects `search_lang` in short code format.
+ */
+function toShortLangCode(lang: string): string {
+  return lang.split(/[-_]/)[0].toLowerCase();
+}
+
+/**
+ * Convert a language code to locale format (e.g. "tr" → "tr-TR", "en" → "en-EN", "tr-TR" → "tr-TR").
+ * Brave Search API expects `ui_lang` in locale format.
+ */
+function toLocaleLangCode(lang: string): string {
+  const parts = lang.split(/[-_]/);
+  const base = parts[0].toLowerCase();
+  const region = parts[1] ? parts[1].toUpperCase() : base.toUpperCase();
+  return `${base}-${region}`;
+}
+
 function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDERS)[number] {
   const raw =
     search && "provider" in search && typeof search.provider === "string"
@@ -672,10 +691,12 @@ async function runWebSearch(params: {
     url.searchParams.set("country", params.country);
   }
   if (params.search_lang) {
-    url.searchParams.set("search_lang", params.search_lang);
+    // Brave expects search_lang as short code (e.g. "tr", "en")
+    url.searchParams.set("search_lang", toShortLangCode(params.search_lang));
   }
   if (params.ui_lang) {
-    url.searchParams.set("ui_lang", params.ui_lang);
+    // Brave expects ui_lang as locale format (e.g. "tr-TR", "en-US")
+    url.searchParams.set("ui_lang", toLocaleLangCode(params.ui_lang));
   }
   if (params.freshness) {
     url.searchParams.set("freshness", params.freshness);
