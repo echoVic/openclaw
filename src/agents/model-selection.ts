@@ -535,7 +535,7 @@ export function resolveReasoningDefault(params: {
   provider: string;
   model: string;
   catalog?: ModelCatalogEntry[];
-  configReasoningDefault?: string;
+  configReasoningDefault?: "off" | "on" | "stream";
 }): "on" | "off" | "stream" {
   // Config override takes priority over model-catalog auto-detection (#24543).
   if (
