@@ -239,12 +239,12 @@ describe("resolveHeartbeatDeliveryTarget", () => {
         },
       },
       {
-        name: "use last route by default",
+        name: "target defaults to none when unset",
         cfg: {},
         entry: { ...baseEntry, lastChannel: "whatsapp", lastTo: "+1555" },
         expected: {
-          channel: "whatsapp",
-          to: "+1555",
+          channel: "none",
+          reason: "target-none",
           accountId: undefined,
           lastChannel: "whatsapp",
           lastAccountId: undefined,
