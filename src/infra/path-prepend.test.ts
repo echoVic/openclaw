@@ -1,5 +1,8 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { applyPathPrepend, mergePathPrepend, normalizePathPrepend } from "./path-prepend.js";
+
+const d = path.delimiter; // ":" on POSIX, ";" on Windows
 
 describe("normalizePathPrepend", () => {
   it("returns empty array for undefined", () => {
@@ -15,17 +18,17 @@ describe("normalizePathPrepend", () => {
 
 describe("mergePathPrepend", () => {
   it("returns existing when prepend is empty", () => {
-    expect(mergePathPrepend("/usr/bin:/bin", [])).toBe("/usr/bin:/bin");
+    expect(mergePathPrepend(`/usr/bin${d}/bin`, [])).toBe(`/usr/bin${d}/bin`);
   });
   it("prepends to existing PATH", () => {
-    const result = mergePathPrepend("/usr/bin:/bin", ["/custom"]);
+    const result = mergePathPrepend(`/usr/bin${d}/bin`, ["/custom"]);
     expect(result).toMatch(/^\/custom/);
     expect(result).toContain("/usr/bin");
     expect(result).toContain("/bin");
   });
   it("deduplicates entries", () => {
-    const result = mergePathPrepend("/usr/bin:/bin", ["/usr/bin", "/custom"]);
-    const parts = result!.split(":");
+    const result = mergePathPrepend(`/usr/bin${d}/bin`, ["/usr/bin", "/custom"]);
+    const parts = result!.split(d);
     const usrBinCount = parts.filter((p) => p === "/usr/bin").length;
     expect(usrBinCount).toBe(1);
   });
@@ -37,7 +40,7 @@ describe("mergePathPrepend", () => {
 
 describe("applyPathPrepend", () => {
   it("prepends to PATH key", () => {
-    const env: Record<string, string> = { PATH: "/usr/bin:/bin" };
+    const env: Record<string, string> = { PATH: `/usr/bin${d}/bin` };
     applyPathPrepend(env, ["/custom"]);
     expect(env.PATH).toMatch(/^\/custom/);
     expect(env.PATH).toContain("/usr/bin");
