@@ -92,10 +92,10 @@ function generateHtml(sessionData: SessionData): string {
 
   return template
     .replace("{{CSS}}", css)
-    .replace("{{JS}}", templateJs)
+    .replace("// {{JS}}", templateJs)
     .replace("{{SESSION_DATA}}", sessionDataBase64)
-    .replace("{{MARKED_JS}}", markedJs)
-    .replace("{{HIGHLIGHT_JS}}", hljsJs);
+    .replace("// {{MARKED_JS}}", markedJs)
+    .replace("// {{HIGHLIGHT_JS}}", hljsJs);
 }
 
 function parseExportArgs(commandBodyNormalized: string): { outputPath?: string } {
