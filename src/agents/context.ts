@@ -176,10 +176,8 @@ export function resolveContextTokensForModel(params: {
   contextTokensOverride?: number;
   fallbackContextTokens?: number;
 }): number | undefined {
-  if (typeof params.contextTokensOverride === "number" && params.contextTokensOverride > 0) {
-    return params.contextTokensOverride;
-  }
-
+  // Check context1m first — it should take precedence over catalog defaults
+  // passed as contextTokensOverride (e.g. agentCfg.contextTokens = 200k).
   const ref = resolveProviderModelRef({
     provider: params.provider,
     model: params.model,
@@ -189,6 +187,10 @@ export function resolveContextTokensForModel(params: {
     if (modelParams?.context1m === true && isAnthropic1MModel(ref.provider, ref.model)) {
       return ANTHROPIC_CONTEXT_1M_TOKENS;
     }
+  }
+
+  if (typeof params.contextTokensOverride === "number" && params.contextTokensOverride > 0) {
+    return params.contextTokensOverride;
   }
 
   return lookupContextTokens(params.model) ?? params.fallbackContextTokens;
