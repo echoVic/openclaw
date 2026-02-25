@@ -336,7 +336,7 @@ const formatCacheLine = (
     (typeof input === "number" ? input : 0);
   const hitRate =
     totalInput > 0 && typeof cacheRead === "number"
-      ? Math.round((cacheRead / totalInput) * 100)
+      ? Math.min(100, Math.round((cacheRead / totalInput) * 100))
       : 0;
 
   return `🗄️ Cache: ${hitRate}% hit · ${cachedLabel} cached, ${newLabel} new`;
