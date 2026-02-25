@@ -227,18 +227,10 @@ function resolveFallbackCandidates(params: {
     if (sameModelCandidate(normalizedPrimary, configuredPrimary)) {
       return configuredFallbacks;
     }
-    // Preserve resilience after failover: when current model is one of the
-    // configured fallback refs, keep traversing the configured fallback chain.
-    const isConfiguredFallback = configuredFallbacks.some((raw) => {
-      const resolved = resolveModelRefFromString({
-        raw: String(raw ?? ""),
-        defaultProvider,
-        aliasIndex,
-      });
-      return resolved ? sameModelCandidate(resolved.ref, normalizedPrimary) : false;
-    });
-    // Keep legacy override behavior for ad-hoc models outside configured chain.
-    return isConfiguredFallback ? configuredFallbacks : [];
+    // Preserve resilience after failover: always include configured fallbacks
+    // so cross-provider resilience is preserved even when the current model is
+    // an ad-hoc session override outside the configured chain.
+    return configuredFallbacks;
   })();
 
   for (const raw of modelFallbacks) {
