@@ -273,33 +273,55 @@ export async function monitorMSTeamsProvider(
     fallback: "/api/messages",
   });
 
-  // Start listening and capture the HTTP server handle
-  const httpServer = expressApp.listen(port, () => {
-    log.info(`msteams provider started on port ${port}`);
-  });
+  // Start listening and capture the HTTP server handle.
+  // Return a Promise that stays pending until the server is shut down,
+  // so the channel lifecycle manager doesn't interpret an immediate return
+  // as "the channel has stopped" and trigger an auto-restart. (#26363)
+  return new Promise<MonitorMSTeamsResult>((resolve, reject) => {
+    let listening = false;
 
-  httpServer.on("error", (err) => {
-    log.error("msteams server error", { error: String(err) });
-  });
+    const httpServer = expressApp.listen(port, () => {
+      listening = true;
+      log.info(`msteams provider started on port ${port}`);
+    });
 
-  const shutdown = async () => {
-    log.info("shutting down msteams provider");
-    return new Promise<void>((resolve) => {
-      httpServer.close((err) => {
-        if (err) {
-          log.debug?.("msteams server close error", { error: String(err) });
-        }
-        resolve();
+    httpServer.on("error", (err) => {
+      log.error("msteams server error", { error: String(err) });
+      // Reject only on startup errors (e.g. EADDRINUSE) so the lifecycle
+      // manager knows startup failed. Post-listen errors are just logged.
+      if (!listening) {
+        reject(err);
+      }
+    });
+
+    const shutdown = async () => {
+      log.info("shutting down msteams provider");
+      return new Promise<void>((innerResolve) => {
+        httpServer.close((err) => {
+          if (err) {
+            log.debug?.("msteams server close error", { error: String(err) });
+          }
+          innerResolve();
+        });
       });
-    });
-  };
+    };
 
-  // Handle abort signal
-  if (opts.abortSignal) {
-    opts.abortSignal.addEventListener("abort", () => {
-      void shutdown();
-    });
-  }
+    // Handle abort signal — shut down the server and resolve the outer Promise
+    // so the lifecycle manager sees a clean exit.
+    if (opts.abortSignal) {
+      if (opts.abortSignal.aborted) {
+        void shutdown().then(() => resolve({ app: expressApp, shutdown }));
+        return;
+      }
+      opts.abortSignal.addEventListener("abort", () => {
+        void shutdown().then(() => resolve({ app: expressApp, shutdown }));
+      });
+    }
 
-  return { app: expressApp, shutdown };
+    // Also resolve when the server closes for any other reason (e.g. httpServer.close()
+    // called externally). This prevents the Promise from leaking.
+    httpServer.on("close", () => {
+      resolve({ app: expressApp, shutdown });
+    });
+  });
 }
