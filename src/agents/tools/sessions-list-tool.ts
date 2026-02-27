@@ -1,4 +1,3 @@
-import path from "node:path";
 import { Type } from "@sinclair/typebox";
 import { loadConfig } from "../../config/config.js";
 import { resolveSessionFilePath } from "../../config/sessions.js";
@@ -161,7 +160,6 @@ export function createSessionsListTool(opts?: {
               sessionFile ? { sessionFile } : undefined,
               {
                 agentId: resolveAgentIdFromSessionKey(key),
-                sessionsDir: path.dirname(storePath),
               },
             );
           } catch {
