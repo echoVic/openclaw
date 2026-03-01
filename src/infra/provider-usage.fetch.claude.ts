@@ -121,7 +121,7 @@ export async function fetchClaudeUsage(
     "https://api.anthropic.com/api/oauth/usage",
     {
       headers: {
-        Authorization: `Bearer ${token}`,
+        "x-api-key": token,
         "User-Agent": "openclaw",
         Accept: "application/json",
         "anthropic-version": "2023-06-01",
