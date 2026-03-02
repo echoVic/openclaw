@@ -24,18 +24,18 @@ export type MessageSentHookContext = {
 };
 
 export function createMessageSentHookHandler(ctx: MessageSentHookContext) {
-  return (payload: ReplyPayload) => {
+  const emitHook = (success: boolean, content: string, error?: string) => {
     const { sessionKey, channelId, accountId, conversationId } = ctx;
-    const content = payload.text ?? "";
     if (sessionKey) {
       emitMessageSentHook({
         sessionKey,
         to: conversationId ?? "",
         content,
-        success: true,
+        success,
         channelId,
         accountId,
         conversationId,
+        ...(error && { error }),
       });
     }
     const hookRunner = getGlobalHookRunner();
@@ -45,7 +45,8 @@ export function createMessageSentHookHandler(ctx: MessageSentHookContext) {
           {
             to: conversationId ?? "",
             content,
-            success: true,
+            success,
+            ...(error && { error }),
           },
           {
             channelId,
@@ -55,6 +56,16 @@ export function createMessageSentHookHandler(ctx: MessageSentHookContext) {
         )
         .catch(() => {});
     }
+  };
+
+  return {
+    onDelivered: (payload: ReplyPayload) => {
+      emitHook(true, payload.text ?? "");
+    },
+    onError: (err: unknown) => {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      emitHook(false, "", errorMessage);
+    },
   };
 }
 
