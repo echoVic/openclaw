@@ -2085,14 +2085,32 @@ run_bootstrap_onboarding_if_needed() {
     }
 }
 
+extract_openclaw_semver() {
+    local raw="${1:-}"
+    local parsed=""
+    parsed="$(
+        printf '%s\n' "$raw" \
+            | tr -d '\r' \
+            | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?(\+[0-9A-Za-z.-]+)?' \
+            | head -n 1 \
+            || true
+    )"
+    printf '%s' "${parsed#v}"
+}
+
 resolve_openclaw_version() {
     local version=""
+    local raw_version_output=""
     local claw="${OPENCLAW_BIN:-}"
     if [[ -z "$claw" ]] && command -v openclaw &> /dev/null; then
         claw="$(command -v openclaw)"
     fi
     if [[ -n "$claw" ]]; then
-        version=$("$claw" --version 2>/dev/null | head -n 1 | tr -d '\r')
+        raw_version_output=$("$claw" --version 2>/dev/null | head -n 1 | tr -d '\r')
+        version="$(extract_openclaw_semver "$raw_version_output")"
+        if [[ -z "$version" ]]; then
+            version="$raw_version_output"
+        fi
     fi
     if [[ -z "$version" ]]; then
         local npm_root=""

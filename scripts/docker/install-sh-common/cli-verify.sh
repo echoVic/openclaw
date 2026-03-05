@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+extract_cli_semver() {
+  local raw="${1:-}"
+  local parsed=""
+  parsed="$(
+    printf '%s\n' "$raw" \
+      | tr -d '\r' \
+      | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?(\+[0-9A-Za-z.-]+)?' \
+      | head -n 1 \
+      || true
+  )"
+  printf '%s' "${parsed#v}"
+}
+
 verify_installed_cli() {
   local package_name="$1"
   local expected_version="$2"
@@ -7,6 +20,7 @@ verify_installed_cli() {
   local cmd_path=""
   local entry_path=""
   local npm_root=""
+  local raw_version_output=""
   local installed_version=""
 
   cmd_path="$(command -v "$cli_name" || true)"
@@ -27,14 +41,19 @@ verify_installed_cli() {
   fi
 
   if [[ -n "$cmd_path" ]]; then
-    installed_version="$("$cmd_path" --version 2>/dev/null | head -n 1 | tr -d '\r')"
+    raw_version_output="$("$cmd_path" --version 2>/dev/null | head -n 1 | tr -d '\r')"
   else
-    installed_version="$(node "$entry_path" --version 2>/dev/null | head -n 1 | tr -d '\r')"
+    raw_version_output="$(node "$entry_path" --version 2>/dev/null | head -n 1 | tr -d '\r')"
   fi
 
-  echo "cli=$cli_name installed=$installed_version expected=$expected_version"
+  installed_version="$(extract_cli_semver "$raw_version_output")"
+  if [[ -z "$installed_version" ]]; then
+    installed_version="$raw_version_output"
+  fi
+
+  echo "cli=$cli_name installed=$installed_version expected=$expected_version raw=$raw_version_output"
   if [[ "$installed_version" != "$expected_version" ]]; then
-    echo "ERROR: expected ${cli_name}@${expected_version}, got ${cli_name}@${installed_version}" >&2
+    echo "ERROR: expected ${cli_name}@${expected_version}, got ${cli_name}@${installed_version} (raw: ${raw_version_output})" >&2
     return 1
   fi
 

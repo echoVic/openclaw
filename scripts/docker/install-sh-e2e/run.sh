@@ -10,6 +10,14 @@ OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 ANTHROPIC_API_TOKEN="${ANTHROPIC_API_TOKEN:-}"
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VERIFY_HELPER_PATH="/usr/local/install-sh-common/cli-verify.sh"
+if [[ ! -f "$VERIFY_HELPER_PATH" ]]; then
+  VERIFY_HELPER_PATH="${SCRIPT_DIR}/../install-sh-common/cli-verify.sh"
+fi
+# shellcheck source=../install-sh-common/cli-verify.sh
+source "$VERIFY_HELPER_PATH"
+
 if [[ "$MODELS_MODE" != "both" && "$MODELS_MODE" != "openai" && "$MODELS_MODE" != "anthropic" ]]; then
   echo "ERROR: OPENCLAW_E2E_MODELS must be one of: both|openai|anthropic" >&2
   exit 2
@@ -68,12 +76,7 @@ else
 fi
 
 echo "==> Verify installed version"
-INSTALLED_VERSION="$(openclaw --version 2>/dev/null | head -n 1 | tr -d '\r')"
-echo "installed=$INSTALLED_VERSION expected=$EXPECTED_VERSION"
-if [[ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]]; then
-  echo "ERROR: expected openclaw@$EXPECTED_VERSION, got openclaw@$INSTALLED_VERSION" >&2
-  exit 1
-fi
+verify_installed_cli "openclaw" "$EXPECTED_VERSION"
 
 set_image_model() {
   local profile="$1"
