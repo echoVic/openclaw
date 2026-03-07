@@ -77,9 +77,14 @@ export function resolveBinaryVersion(params: {
   bundledVersion?: string;
   fallback?: string;
 }): string {
+  const packageVersion = readVersionFromPackageJsonForModuleUrl(params.moduleUrl) ?? undefined;
+  const buildInfoVersion = readVersionFromBuildInfoForModuleUrl(params.moduleUrl) ?? undefined;
   return (
+    // In npm installs, package.json is the most reliable source after updates.
+    // Build-time injected versions can lag behind when dist artifacts are stale.
+    firstNonEmpty(packageVersion) ||
     firstNonEmpty(params.injectedVersion) ||
-    resolveVersionFromModuleUrl(params.moduleUrl) ||
+    firstNonEmpty(buildInfoVersion) ||
     firstNonEmpty(params.bundledVersion) ||
     params.fallback ||
     "0.0.0"

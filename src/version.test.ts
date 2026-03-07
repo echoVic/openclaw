@@ -97,7 +97,7 @@ describe("version resolution", () => {
     expect(resolveVersionFromModuleUrl("not-a-valid-url")).toBeNull();
   });
 
-  it("resolves binary version with explicit precedence", async () => {
+  it("resolves binary version with runtime metadata precedence", async () => {
     await withTempDir(async (root) => {
       await writeJsonFixture(root, "package.json", { name: "openclaw", version: "2.3.4" });
       const moduleUrl = await ensureModuleFixture(root);
@@ -108,7 +108,7 @@ describe("version resolution", () => {
           bundledVersion: "8.8.8",
           fallback: "0.0.0",
         }),
-      ).toBe("9.9.9");
+      ).toBe("2.3.4");
       expect(
         resolveBinaryVersion({
           moduleUrl,
@@ -130,6 +130,21 @@ describe("version resolution", () => {
           fallback: "0.0.0",
         }),
       ).toBe("0.0.0");
+    });
+  });
+
+  it("prefers injected version over build-info when package metadata is unavailable", async () => {
+    await withTempDir(async (root) => {
+      await writeJsonFixture(root, "build-info.json", { version: "4.5.6" });
+      const moduleUrl = await ensureModuleFixture(root);
+      expect(
+        resolveBinaryVersion({
+          moduleUrl,
+          injectedVersion: "9.9.9",
+          bundledVersion: "8.8.8",
+          fallback: "0.0.0",
+        }),
+      ).toBe("9.9.9");
     });
   });
 
